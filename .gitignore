@@ -1,0 +1,57 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# ASP.NET Core
+wwwroot/lib/
+
+# Sensitive configuration files
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Staging.json
+
+# Allow example configuration
+!**/appsettings.example.json
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+secrets.json
+
+# Publishing profiles and credentials
+**/PublishProfiles/
+*.pubxml
+*.pubxml.user
+
+# Certificates and keys
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Deployment files
+BulkyBookDeploy.sql
+
+# Logs
+*.log
+
+# Temporary files
+[Tt]emp/
+[Tt]mp/

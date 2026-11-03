@@ -1,0 +1,12 @@
+﻿@using BulkyBook.Utility
+
+@{
+    if(User.IsInRole(SD.RoleAdmin) || User.IsInRole(SD.RoleEmployee) )
+    {
+        Layout = "_AdminLayout";
+    }
+    else
+    {
+        Layout = "_Layout";
+    }
+}
