@@ -1,107 +1,115 @@
-﻿@model ShoppingCart
+@model ShoppingCart
+@{
+    var p = Model.Product;
+    ViewData["Title"] = p.Title;
+    var isAuth = User.Identity?.IsAuthenticated ?? false;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
 
 <div class="container py-4">
-    <!-- TODO: Add form with post method -->
-    <form method="post">
-        <input hidden asp-for="ProductId">
+    <nav class="bb-crumbs mb-3" aria-label="breadcrumb">
+        <a asp-area="Customer" asp-controller="Home" asp-action="Index">Shop</a>
+        <i class="bi bi-chevron-right mx-1 small"></i>
+        <a asp-area="Customer" asp-controller="Home" asp-action="Index" asp-route-categoryId="@p.CategoryId">@p.Category?.Name</a>
+        <i class="bi bi-chevron-right mx-1 small"></i>
+        <span>@p.Title</span>
+    </nav>
 
-        <div class="mb-3">
-            <!-- TODO: Add back link to Index page -->
-            <a asp-area="Customer" asp-controller="Home" asp-action="Index"
-                 class="text-decoration-none text-secondary small fw-medium d-inline-flex align-items-center gap-1">
-                <i class="bi bi-arrow-left"></i> Back to all books
-            </a>
-        </div>
-
-        <div class="card border shadow-sm overflow-hidden">
-            <div class="row g-0">
-                <!-- Image -->
-                <div class="col-lg-5 d-flex align-items-stretch" style="background: linear-gradient(135deg, #1e293b, #334155, #475569); min-height: 480px;">
-                    @if (!string.IsNullOrEmpty(Model.Product.ImageUrl))
+    <form method="post" class="bb-detail">
+        <input type="hidden" asp-for="ProductId" />
+        <div class="row g-0">
+            <div class="col-lg-5">
+                <div class="bb-detail-media h-100">
+                    @if (!string.IsNullOrEmpty(p.ImageUrl))
                     {
-                        <img src="@Url.Content("~/" + Model.Product.ImageUrl.TrimStart('/'))"
-                             class="w-100 h-100"
-                             style="object-fit: cover;"
-                             alt="@Model.Product.Title" />
+                        <img src="@Url.Content("~/" + p.ImageUrl.TrimStart('/'))" alt="@p.Title" />
                     }
                     else
                     {
-                        <div class="d-flex flex-column align-items-center justify-content-center w-100">
-                            <i class="bi bi-book" style="font-size: 8rem; color: #64748b;"></i>
-                            <p class="text-secondary small mt-3">No Image Available</p>
-                        </div>
+                        <div class="text-center text-secondary"><i class="bi bi-book" style="font-size:7rem"></i><p class="small mt-2">No image available</p></div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-7 p-4 p-lg-5">
+                <span class="badge rounded-pill mb-3" style="background:var(--bb-brand-soft);color:var(--bb-brand-600)">
+                    <i class="bi bi-bookmark me-1"></i>@p.Category?.Name
+                </span>
+                <h1 class="h2 fw-bold mb-1" style="letter-spacing:-.02em">@p.Title</h1>
+                <p class="text-secondary mb-1">by <span class="fw-semibold" style="color:var(--bb-text)">@p.Author</span></p>
+                <p class="text-secondary small mb-4">ISBN: @p.ISBN</p>
+
+                <div class="d-flex align-items-baseline gap-2 mb-4">
+                    <span class="h2 fw-bold mb-0" id="unitPrice" style="color:var(--bb-brand-600)">@p.Price.ToString("c")</span>
+                    @if (p.ListPrice > p.Price)
+                    {
+                        <span class="text-decoration-line-through text-secondary">@p.ListPrice.ToString("c")</span>
+                        <span class="badge text-bg-success">Save @((int)Math.Round((1 - p.Price / p.ListPrice) * 100))%</span>
                     }
                 </div>
 
-                <!-- Details -->
-                <div class="col-lg-7 p-4 p-lg-5">
-                    <!-- TODO: Display category name dynamically -->
-                    <span class="badge mb-3" style="background: rgba(23,163,74,0.1); color: #17A34A;">
-                        <i class="bi bi-bookmark me-1"></i> @Model.Product.Category.Name
-                    </span>
-                    <!-- TODO: Display product title -->
-                    <h1 class="h3 fw-bold mb-1">@Model.Product.Title</h1>
-                    <!-- TODO: Display author name -->
-                    <p class="text-secondary mb-2">by <span class="fw-medium text-dark">@Model.Product.Author</span></p>
-                    <!-- TODO: Display ISBN -->
-                    <p class="text-secondary small mb-4">ISBN: @Model.Product.ISBN</p>
-
-                    <div class="d-flex align-items-baseline gap-2 mb-4">
-                        <!-- TODO: Display Price (regular price) -->
-                        <span class="h3 fw-bold mb-0" style="color: #17A34A;">@Model.Price.ToString("c")</span>
-                        <!-- TODO: Display ListPrice (strikethrough) -->
-                        <span class="text-decoration-line-through text-secondary">@Model.Product.ListPrice.ToString("c")</span>
-                    </div>
-
-                    <!-- Volume Discounts -->
-                    <div class="border rounded p-3 mb-4 bg-light">
-                        <p class="text-uppercase fw-bold text-secondary mb-3" style="font-size: 0.65rem; letter-spacing: 0.1em;">
-                            <i class="bi bi-stack me-1" style="color: #17A34A;"></i> Volume Discounts
-                        </p>
-                        <div class="row g-2 text-center">
-                            <div class="col-4">
-                                <div class="bg-white border rounded p-2 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center">
-                                    <p class="text-uppercase text-secondary mb-1" style="font-size: 0.6rem; font-weight: 700;">1-50 Units</p>
-                                    <!-- TODO: Display Price -->
-                                    <p class="fw-bold mb-0" style="color: #17A34A;">@Model.Price.ToString("c")</p>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="bg-white border rounded p-2 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-color: rgba(23,163,74,0.3) !important;">
-                                    <p class="text-uppercase text-secondary mb-1" style="font-size: 0.6rem; font-weight: 700;">51-100 Units</p>
-                                    <!-- TODO: Display Price50 -->
-                                    <p class="fw-bold mb-0" style="color: #17A34A;">@Model.Product.Price50.ToString("c")</p>
-                                    <span class="badge mt-1" style="font-size: 0.55rem; background: rgba(23,163,74,0.1); color: #17A34A;">SAVE</span>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="bg-white border rounded p-2 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-color: #17A34A !important;">
-                                    <p class="text-uppercase text-secondary mb-1" style="font-size: 0.6rem; font-weight: 700;">100+ Units</p>
-                                    <!-- TODO: Display Price100 -->
-                                    <p class="fw-bold mb-0" style="color: #17A34A;">@Model.Product.Price100.ToString("c")</p>
-                                    <span class="badge text-white mt-1" style="font-size: 0.55rem; background: #17A34A;">BEST</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TODO: Display product description (use Html.Raw for HTML content) -->
-                    <div class="text-secondary small mb-4">
-                        @Html.Raw(@Model.Product.Description)
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="input-group" style="width: 140px;">
-                            <span class="input-group-text fw-semibold small" style="background: #17A34A; color: #fff;">Qty</span>
-                            
-                            <input asp-for="Count" type="number"  class="form-control text-center fw-medium" />
-                        </div>
-                        <button type="submit" class="btn btn-accent flex-grow-1 fw-semibold py-2">
-                            <i class="bi bi-cart-plus me-1"></i> Add to Cart
-                        </button>
+                <div class="mb-4">
+                    <p class="text-uppercase fw-bold text-secondary mb-2" style="font-size:.7rem;letter-spacing:.08em">
+                        <i class="bi bi-stack me-1" style="color:var(--bb-brand)"></i>Volume pricing
+                    </p>
+                    <div class="row g-2">
+                        <div class="col-4"><div class="bb-tier" id="tier1"><small>1–50</small><b>@p.Price.ToString("c")</b></div></div>
+                        <div class="col-4"><div class="bb-tier" id="tier2"><small>51–100</small><b>@p.Price50.ToString("c")</b></div></div>
+                        <div class="col-4"><div class="bb-tier" id="tier3"><small>100+</small><b>@p.Price100.ToString("c")</b></div></div>
                     </div>
                 </div>
+
+                @if (!string.IsNullOrWhiteSpace(p.Description))
+                {
+                    @* Description is authored by Admin in the product editor and may contain HTML. *@
+                    <div class="text-secondary mb-4">@Html.Raw(p.Description)</div>
+                }
+
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="bb-qty" role="group" aria-label="Quantity">
+                        <button type="button" class="bb-qty-btn" id="qtyMinus" aria-label="Decrease"><i class="bi bi-dash-lg"></i></button>
+                        <input asp-for="Count" type="number" min="1" max="1000" id="qty" aria-label="Quantity" />
+                        <button type="button" class="bb-qty-btn" id="qtyPlus" aria-label="Increase"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    @if (isAuth)
+                    {
+                        <button type="submit" class="btn btn-brand btn-lg flex-grow-1 py-2"><i class="bi bi-cart-plus me-2"></i>Add to cart</button>
+                    }
+                    else
+                    {
+                        <a class="btn btn-brand btn-lg flex-grow-1 py-2" asp-area="Identity" asp-controller="Account" asp-action="Login" asp-route-returnUrl="@returnUrl">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Log in to add to cart
+                        </a>
+                    }
+                </div>
+                <p class="mt-3 mb-0 fw-semibold" id="lineTotal" style="font-size:.95rem"></p>
             </div>
         </div>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var p1 = @p.Price.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                p2 = @p.Price50.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                p3 = @p.Price100.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var qty = document.getElementById('qty');
+            function clamp() { var v = parseInt(qty.value, 10); if (isNaN(v) || v < 1) v = 1; if (v > 1000) v = 1000; return v; }
+            function paint() {
+                var n = clamp(), unit = n <= 50 ? p1 : (n <= 100 ? p2 : p3);
+                document.getElementById('tier1').classList.toggle('active', n <= 50);
+                document.getElementById('tier2').classList.toggle('active', n > 50 && n <= 100);
+                document.getElementById('tier3').classList.toggle('active', n > 100);
+                document.getElementById('lineTotal').textContent =
+                    n + ' × ' + unit.toLocaleString(undefined, { style: 'currency', currency: 'USD' }) +
+                    ' = ' + (unit * n).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+            }
+            document.getElementById('qtyMinus').onclick = function () { qty.value = Math.max(1, clamp() - 1); paint(); };
+            document.getElementById('qtyPlus').onclick = function () { qty.value = Math.min(1000, clamp() + 1); paint(); };
+            qty.addEventListener('input', paint);
+            qty.addEventListener('blur', function () { qty.value = clamp(); paint(); });
+            paint();
+        })();
+    </script>
+}

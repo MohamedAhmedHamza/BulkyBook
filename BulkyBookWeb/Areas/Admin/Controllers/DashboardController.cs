@@ -3,6 +3,7 @@ using BulkyBook.Models.ViewModels;
     using BulkyBook.Utility;
     using BulkyBookWeb.DataAccess.Data;
 using Mailjet.Client.Resources.SMS;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
     using Microsoft.EntityFrameworkCore;
     using System.Reflection.Emit;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
     namespace BulkyBookWeb.Areas.Admin.Controllers
     {
         [Area("Admin")]
+        [Authorize(Roles = SD.RoleAdmin + "," + SD.RoleEmployee)]
         public class DashboardController : Controller
         {
             private readonly ApplicationDbContext _db;

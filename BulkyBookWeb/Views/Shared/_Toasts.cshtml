@@ -1,0 +1,21 @@
+@* Renders TempData messages as toasts. Messages are JSON-encoded (XSS-safe).
+   Supports both "success"/"error" and the "Error" key used by CartController. *@
+@{
+    string? success = TempData["success"] as string;
+    string? error = (TempData["error"] as string) ?? (TempData["Error"] as string);
+}
+@if (!string.IsNullOrEmpty(success) || !string.IsNullOrEmpty(error))
+{
+    <script>
+        $(function () {
+            @if (!string.IsNullOrEmpty(success))
+            {
+                <text>toastr.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(success)));</text>
+            }
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(error)));</text>
+            }
+        });
+    </script>
+}

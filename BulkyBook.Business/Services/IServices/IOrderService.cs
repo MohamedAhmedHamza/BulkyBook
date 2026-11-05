@@ -16,7 +16,15 @@ namespace BulkyBook.Business.Services.IServices
 
         Task<bool> CancelOrderWithRefundAsync(int orderID);
         Task<string> CreateStripeCheckoutSessionAsync(OrderHeader orderHeader,IEnumerable<ShoppingCart> cartItems, string domain);
-        Task<bool> VerifyStripePaymentAsync(OrderHeader orderHeader);
+        Task<PaymentVerification> VerifyStripePaymentAsync(OrderHeader orderHeader);
+        /// <summary>Atomically moves Pending -> Approved. True only for the call that made the transition (idempotent).</summary>
+        Task<bool> MarkAsPaidAsync(int orderId, string? sessionId, string? paymentIntentId);
+        /// <summary>Atomically moves Pending -> Cancelled (abandoned / expired checkout).</summary>
+        Task<bool> CancelPendingOrderAsync(int orderId);
 
     }
+
+    /// <param name="IsPaid">Stripe reports the checkout session as paid.</param>
+    /// <param name="NewlyApproved">This call is the one that approved the order (send e-mail / clear cart once).</param>
+    public record PaymentVerification(bool IsPaid, bool NewlyApproved);
 }

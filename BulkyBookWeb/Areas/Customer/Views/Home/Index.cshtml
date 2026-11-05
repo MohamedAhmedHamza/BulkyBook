@@ -1,68 +1,137 @@
-﻿@model IEnumerable<Product>
+@model ProductListVM
+@{
+    ViewData["Title"] = "Shop";
+    var currentCat = Model.Categories.FirstOrDefault(c => c.Id == Model.CategoryId);
+}
 
+<partial name="_Hero" model="Model" />
 
-<!-- Hero Section -->
-<partial name="_Hero" />
-<!-- Catalog Section -->
 <div class="container py-5" id="catalog">
-    <div class="mb-4">
-        <h2 class="fw-bold mb-1">Our Collection</h2>
-        <!-- TODO: Display dynamic book count here -->
-        <p class="text-secondary mb-0">Explore all @Model.Count() books in our catalog</p>
+
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+        <div>
+            <h2 class="fw-bold mb-1">@(currentCat?.Name ?? "Our collection")</h2>
+            <p class="text-secondary mb-0">
+                @Model.TotalCount @(Model.TotalCount == 1 ? "book" : "books")
+                @if (!string.IsNullOrWhiteSpace(Model.Search)) { <text> matching “@Model.Search”</text> }
+            </p>
+        </div>
     </div>
 
-    <!-- Books Grid -->
-    @if(Model.Any())
-    {
-         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-
-       @foreach(var product in Model)
-       {
-           <div class="col">
-            <div class="card h-100 border shadow-sm book-card">
-                        <a asp-action="Details" asp-route-productid="@product.Id" class="text-decoration-none">
-                    <div style="aspect-ratio: 3/4; overflow: hidden;">
-                                @if (!string.IsNullOrEmpty(product.ImageUrl))
-                                {
-                                    <img src="@product.ImageUrl" class="m-100 h-100" style="object-fit:cover;"/>
-                                }
-                                else
-                                {
-                                    <div class="w-100 h-100 d-flex align-items-center justify-content-center bg-light">
-                                        <i class="bi bi-book display-3 text-secondary"></i>
-                                    </div>
-                                }
-                    </div>
-                </a>
-                <div class="card-body">
-                    
-                    <span class="badge bg-secondary mb-2">@product.Category.Name</span>
-                    <h6 class="card-title fw-semibold mb-2" style="min-height: 2.5rem;">
-                        <a href="#" class="text-decoration-none text-dark">
-                           @product.Title
-                        </a>
-                    </h6>
-                    <p class="text-secondary small mb-2">@product.Author</p>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="fw-bold text-success">@product.Price100.ToString("c")</span>
-                                    @if(product.ListPrice > product.Price100)
-                                    {
-                                        <small class="text-decoration-line-through text-muted ms-1">@product.ListPrice.ToString("c")</small>
-                                    }
-                        </div>
-                        <!-- TODO: Link to details page with product ID -->
-                        <a asp-action="Details" asp-route-productid="@product.Id" class="btn btn-sm btn-outline-dark">
-                            View
-                        </a>
-                    </div>
+    @* ---- Filters (GET form → wired to HomeController.Index) ---- *@
+    <form method="get" asp-area="Customer" asp-controller="Home" asp-action="Index" class="bb-toolbar mb-3">
+        <input type="hidden" name="categoryId" value="@Model.CategoryId" />
+        <div class="row g-2 align-items-center">
+            <div class="col-md">
+                <div class="bb-search">
+                    <i class="bi bi-search"></i>
+                    <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search by title, author or ISBN" aria-label="Search books" />
                 </div>
             </div>
+            <div class="col-6 col-md-auto">
+                <select name="sort" class="form-select" aria-label="Sort" onchange="this.form.submit()">
+                    <option value="newest" selected="@(Model.Sort == "newest")">Newest</option>
+                    <option value="price_asc" selected="@(Model.Sort == "price_asc")">Price: low to high</option>
+                    <option value="price_desc" selected="@(Model.Sort == "price_desc")">Price: high to low</option>
+                    <option value="title" selected="@(Model.Sort == "title")">Title A–Z</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-auto d-flex gap-2">
+                <button type="submit" class="btn btn-brand flex-fill"><i class="bi bi-search me-1"></i>Search</button>
+                @if (Model.HasFilters)
+                {
+                    <a asp-action="Index" class="btn btn-soft" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+                }
+            </div>
         </div>
-       }
+    </form>
+
+    @* ---- Category chips ---- *@
+    <div class="bb-chips mb-4">
+        <a class="bb-chip @(Model.CategoryId == null ? "active" : "")" asp-action="Index" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort">All</a>
+        @foreach (var c in Model.Categories)
+        {
+            <a class="bb-chip @(Model.CategoryId == c.Id ? "active" : "")" asp-action="Index" asp-route-categoryId="@c.Id" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort">@c.Name</a>
+        }
     </div>
+
+    @if (Model.Products.Any())
+    {
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 g-lg-4">
+            @foreach (var product in Model.Products)
+            {
+                var hasDiscount = product.ListPrice > product.Price;
+                var pct = hasDiscount ? (int)Math.Round((1 - product.Price / product.ListPrice) * 100) : 0;
+                <div class="col">
+                    <article class="bb-product">
+                        <a class="bb-product-media" asp-action="Details" asp-route-productId="@product.Id" aria-label="@product.Title">
+                            @if (!string.IsNullOrEmpty(product.ImageUrl))
+                            {
+                                <img src="@Url.Content("~/" + product.ImageUrl.TrimStart('/'))" alt="@product.Title" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="d-flex h-100 align-items-center justify-content-center"><i class="bi bi-book display-3 text-secondary"></i></span>
+                            }
+                            <span class="bb-product-cat">@product.Category?.Name</span>
+                            @if (pct > 0) { <span class="bb-product-save">-@pct%</span> }
+                        </a>
+                        <div class="bb-product-body">
+                            <a class="bb-product-title" asp-action="Details" asp-route-productId="@product.Id">@product.Title</a>
+                            <span class="bb-product-author">@product.Author</span>
+                            <div class="bb-product-foot">
+                                <div>
+                                    <div>
+                                        <span class="bb-price">@product.Price.ToString("c")</span>
+                                        @if (hasDiscount) { <span class="bb-price-old">@product.ListPrice.ToString("c")</span> }
+                                    </div>
+                                    @if (product.Price100 < product.Price)
+                                    {
+                                        <div class="bb-bulk">@product.Price100.ToString("c") from 100+</div>
+                                    }
+                                </div>
+                                <a asp-action="Details" asp-route-productId="@product.Id" class="btn btn-sm btn-brand">View</a>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            }
+        </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            var start = Math.Max(1, Model.Page - 2);
+            var end = Math.Min(Model.TotalPages, Model.Page + 2);
+            <nav class="mt-5" aria-label="Catalog pages">
+                <ul class="bb-pagination">
+                    <li class="@(Model.Page == 1 ? "disabled" : "")">
+                        @if (Model.Page == 1) { <span><i class="bi bi-chevron-left"></i></span> }
+                        else { <a asp-action="Index" asp-all-route-data="@(new Dictionary<string,string?>{{"search",Model.Search},{"categoryId",Model.CategoryId?.ToString()},{"sort",Model.Sort},{"page",(Model.Page-1).ToString()}})"><i class="bi bi-chevron-left"></i></a> }
+                    </li>
+                    @for (var i = start; i <= end; i++)
+                    {
+                        <li class="@(i == Model.Page ? "active" : "")">
+                            @if (i == Model.Page) { <span>@i</span> }
+                            else { <a asp-action="Index" asp-all-route-data="@(new Dictionary<string,string?>{{"search",Model.Search},{"categoryId",Model.CategoryId?.ToString()},{"sort",Model.Sort},{"page",i.ToString()}})">@i</a> }
+                        </li>
+                    }
+                    <li class="@(Model.Page == Model.TotalPages ? "disabled" : "")">
+                        @if (Model.Page == Model.TotalPages) { <span><i class="bi bi-chevron-right"></i></span> }
+                        else { <a asp-action="Index" asp-all-route-data="@(new Dictionary<string,string?>{{"search",Model.Search},{"categoryId",Model.CategoryId?.ToString()},{"sort",Model.Sort},{"page",(Model.Page+1).ToString()}})"><i class="bi bi-chevron-right"></i></a> }
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="bb-empty">
+            <i class="bi bi-search"></i>
+            <h5 class="fw-bold mt-3">No books found</h5>
+            <p class="text-secondary mb-3">Try a different keyword or clear the filters.</p>
+            <a asp-action="Index" class="btn btn-brand">Show all books</a>
+        </div>
     }
 </div>
 
-<!-- Newsletter Section -->
 <partial name="_Newsletter" />

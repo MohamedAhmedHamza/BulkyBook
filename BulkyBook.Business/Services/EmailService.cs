@@ -36,24 +36,16 @@ namespace BulkyBook.Business.Services
                     .WithHtmlPart(body)
                     .WithTo(new SendContact(toEmail))
                     .Build();
-                /*var response = await client.SendTransactionalEmailAsync(email);
-                if(response.Messages != null && response.Messages.Length > 0)
+                var response = await client.SendTransactionalEmailAsync(email);
+                if (response.Messages != null && response.Messages.Length > 0)
                 {
-                    var message = response.Messages[0];
-                    if (message.Status == "success")
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }*/
-                return true;
+                    return response.Messages[0].Status == "success";
+                }
+                return false;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-
+                // Mail problems must never break checkout; callers treat false as 'not sent'.
                 return false;
             }
         }
@@ -68,7 +60,6 @@ namespace BulkyBook.Business.Services
                 $"<p><strong>Order Date:</strong> {DateTime.Now:yyyy-MM-dd}</p>" +
                 $"<p><strong>Total Amount:</strong> {orderTotal:C}</p>" +
                 $"<hr/> " +
-                $"<p> بشرط انتي الي تدفعي مش حمزة </p>" +
                 $"<p>Thank you for choosing our store!</p>";
 
             return await SendEmailAsync(toEmail, subject, body);

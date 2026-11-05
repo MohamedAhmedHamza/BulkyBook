@@ -30,41 +30,67 @@ namespace BulkyBook.Business.Services
             {
                 throw new KeyNotFoundException($"Order {orderId} not found");
             }
-            if(order.OrderStatus == SD.StatusShipped)
+
+            if (order.OrderStatus == SD.StatusShipped)
             {
-                throw new InvalidOperationException("Can't cancel orders that have already been shipped ");
+                throw new InvalidOperationException("Can't cancel orders that have already been shipped.");
             }
-            if(order.OrderStatus == SD.StatusCancelled || order.OrderStatus == SD.StatusRefunded)
+
+            if (order.OrderStatus == SD.StatusCancelled ||
+                order.OrderStatus == SD.StatusRefunded)
             {
-                throw new InvalidOperationException("Order has already been cancelled");    
+                throw new InvalidOperationException("Order has already been cancelled or refunded.");
             }
+
             bool refundIssued = false;
-            if(!string.IsNullOrEmpty(order.PaymentIntentId) && (order.OrderStatus == SD.StatusApproved || order.OrderStatus == SD.StatusInProcess))
+
+            // Paid orders must be refunded before changing their status.
+            if (order.OrderStatus == SD.StatusApproved ||
+                order.OrderStatus == SD.StatusInProcess)
             {
+                if (string.IsNullOrEmpty(order.PaymentIntentId))
+                {
+                    throw new InvalidOperationException(
+                        "Cannot refund this order because its PaymentIntentId is missing.");
+                }
+
                 try
                 {
-                    var options = new RefundCreateOptions {PaymentIntent = order.PaymentIntentId, Reason = RefundReasons.RequestedByCustomer};
+                    var options = new RefundCreateOptions
+                    {
+                        PaymentIntent = order.PaymentIntentId,
+                        Reason = RefundReasons.RequestedByCustomer
+                    };
+
                     var service = new RefundService();
                     Refund refund = service.Create(options);
+
                     if (refund.Status == "succeeded" || refund.Status == "pending")
                     {
                         refundIssued = true;
                         order.OrderStatus = SD.StatusRefunded;
                     }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            $"Stripe refund was not successful. Refund status: {refund.Status}");
+                    }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
-                    order.OrderStatus = SD.StatusCancelled;
-                    await _db.SaveChangesAsync();
-                    throw new InvalidOperationException($"Stripe refund faild:{ex.Message}.Order has been cancelled ");
+                    // Keep the original order status if the refund fails.
+                    throw new InvalidOperationException(
+                        $"Stripe refund failed. The order status was not changed. Details: {ex.Message}", ex);
                 }
             }
             else
             {
+                // Unpaid orders can be cancelled without a refund.
                 order.OrderStatus = SD.StatusCancelled;
             }
 
             await _db.SaveChangesAsync();
+
             return refundIssued;
         }
 
@@ -95,7 +121,7 @@ namespace BulkyBook.Business.Services
                 {
                     PriceData = new SessionLineItemPriceDataOptions
                     {
-                        UnitAmount = (long)(item.Product.Price * 100), // Convert to cents
+                        UnitAmount = (long)Math.Round(item.Price * 100), // tiered price (1-50 / 51-100 / 100+), in cents
                         Currency = "usd",
                         ProductData = new SessionLineItemPriceDataProductDataOptions
                         {
@@ -169,9 +195,9 @@ namespace BulkyBook.Business.Services
                 throw new ArgumentException("Order not found");
             }
             order.OrderStatus = orderStatus;
-            if(orderStatus == order.OrderStatus)
+            if (orderStatus == SD.StatusShipped)
             {
-                order.ShippingDate = DateTime.Now; 
+                order.ShippingDate = DateTime.Now;
                 if (!string.IsNullOrEmpty(carrier))
                 {
                     order.Carrier = carrier;
@@ -202,20 +228,84 @@ namespace BulkyBook.Business.Services
             await _db.SaveChangesAsync();
         }
 
-        public async Task<bool> VerifyStripePaymentAsync(OrderHeader orderHeader)
+        public async Task<PaymentVerification> VerifyStripePaymentAsync(OrderHeader orderHeader)
         {
+            // Always get the latest order state from the database.
+            var currentOrder = await _db.OrderHeaders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == orderHeader.Id);
+
+            if (currentOrder == null || string.IsNullOrEmpty(currentOrder.SessionId))
+            {
+                return new PaymentVerification(false, false);
+            }
+
+            // Verify the payment directly with Stripe.
             var service = new SessionService();
-            Session session = service.Get(orderHeader.SessionId);
-            if (session.PaymentStatus.ToLower() == "paid")
+            Session session = service.Get(currentOrder.SessionId);
+
+            if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
             {
-                await UpdateStripePaymentAsync(orderHeader.Id, session.Id, session.PaymentIntentId);
-                await UpdateOrderStatusAsync(orderHeader.Id, SD.StatusApproved);
-                return true;
+                return new PaymentVerification(false, false);
             }
-            else
+
+            // A cancelled or refunded order must not be displayed as successfully paid.
+            if (currentOrder.OrderStatus == SD.StatusCancelled ||
+                currentOrder.OrderStatus == SD.StatusRefunded)
             {
-                return false;
+                return new PaymentVerification(false, false);
             }
+
+            // Approve the order only if it is still pending.
+            if (currentOrder.OrderStatus == SD.StatusPending)
+            {
+                var newlyApproved = await MarkAsPaidAsync(
+                    currentOrder.Id,
+                    session.Id,
+                    session.PaymentIntentId);
+
+                if (newlyApproved)
+                {
+                    return new PaymentVerification(true, true);
+                }
+
+                // Another request may have updated the order at the same time.
+                currentOrder = await _db.OrderHeaders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(o => o.Id == orderHeader.Id);
+
+                if (currentOrder == null)
+                {
+                    return new PaymentVerification(false, false);
+                }
+            }
+
+            // Paid orders remain successful without changing their status again.
+            bool isOrderPaid =
+                currentOrder.OrderStatus == SD.StatusApproved ||
+                currentOrder.OrderStatus == SD.StatusInProcess ||
+                currentOrder.OrderStatus == SD.StatusShipped;
+
+            return new PaymentVerification(isOrderPaid, false);
+        }
+
+        public async Task<bool> MarkAsPaidAsync(int orderId, string? sessionId, string? paymentIntentId)
+        {
+            var affected = await _db.OrderHeaders
+                .Where(o => o.Id == orderId && o.OrderStatus == SD.StatusPending)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(o => o.OrderStatus, SD.StatusApproved)
+                    .SetProperty(o => o.SessionId, o => sessionId ?? o.SessionId)
+                    .SetProperty(o => o.PaymentIntentId, o => paymentIntentId ?? o.PaymentIntentId));
+            return affected > 0;
+        }
+
+        public async Task<bool> CancelPendingOrderAsync(int orderId)
+        {
+            var affected = await _db.OrderHeaders
+                .Where(o => o.Id == orderId && o.OrderStatus == SD.StatusPending)
+                .ExecuteUpdateAsync(set => set.SetProperty(o => o.OrderStatus, SD.StatusCancelled));
+            return affected > 0;
         }
     }
 }

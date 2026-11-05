@@ -1,35 +1,34 @@
-﻿
-<div class="d-flex align-items-center justify-content-center py-5" style="min-height: 70vh;">
-    <div style="width: 100%; max-width: 420px;" class="text-center">
-        <div class="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center shadow" style="width: 80px; height: 80px; background: linear-gradient(135deg, #17A34A, #10b981);">
-            <i class="bi bi-check-lg display-5 text-white"></i>
-        </div>
+@model int
+@{
+    ViewData["Title"] = "Order confirmation";
+    var paid = ViewBag.Paid is bool b && b;
+}
 
-        <h1 class="h3 fw-bold mb-2">Order Confirmed!</h1>
-        <p class="text-secondary mb-4">Thank you for your purchase. We're preparing your order.</p>
+<div class="bb-status">
+    <div style="width:100%;max-width:460px">
+        @if (paid)
+        {
+            <div class="bb-status-icon"><i class="bi bi-check-lg"></i></div>
+            <h1 class="h3 fw-bold mb-2">Order confirmed!</h1>
+            <p class="text-secondary mb-4">Thank you for your purchase. A confirmation e-mail is on its way and we are preparing your order.</p>
+        }
+        else
+        {
+            <div class="bb-status-icon warn"><i class="bi bi-hourglass-split"></i></div>
+            <h1 class="h3 fw-bold mb-2">We're confirming your payment</h1>
+            <p class="text-secondary mb-4">Your order is saved, but we could not confirm the payment yet. Refresh this page in a moment. If you were charged and nothing changes, contact support with the order number below.</p>
+        }
 
-        <div class="card border shadow-sm overflow-hidden mb-4">
-            <div class="card-header text-white py-2 text-center" style="background: linear-gradient(to right, #065f46, #282828, #191414);">
-                <p class="text-uppercase fw-semibold mb-0" style="font-size: 0.65rem; letter-spacing: 0.1em;">Order Number</p>
-            </div>
+        <div class="card mb-4" style="border-radius:var(--bb-radius)">
             <div class="card-body py-4">
-                <span class="display-6 fw-bold" style="color: #17A34A;">@Model</span>
-            </div>
-            <div class="card-footer bg-light">
-                <div class="d-flex justify-content-center gap-4 small text-secondary">
-                    <span><i class="bi bi-envelope me-1"></i> Confirmation sent</span>
-                    <span><i class="bi bi-truck me-1"></i> Tracking available soon</span>
-                </div>
+                <div class="text-uppercase text-secondary fw-semibold" style="font-size:.7rem;letter-spacing:.1em">Order number</div>
+                <div class="display-6 fw-bold" style="color:var(--bb-brand-600)">#@Model</div>
             </div>
         </div>
 
         <div class="d-grid gap-2">
-            <a href="#" class="btn text-white fw-semibold" style="background: #17A34A;">
-                <i class="bi bi-box me-1"></i> View My Orders
-            </a>
-            <a href="#" class="btn btn-outline-secondary fw-semibold">
-                <i class="bi bi-house me-1"></i> Continue Shopping
-            </a>
+            <a class="btn btn-brand" asp-area="Admin" asp-controller="Order" asp-action="Details" asp-route-orderId="@Model"><i class="bi bi-box-seam me-2"></i>View this order</a>
+            <a class="btn btn-soft" asp-area="Customer" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i>Continue shopping</a>
         </div>
     </div>
 </div>

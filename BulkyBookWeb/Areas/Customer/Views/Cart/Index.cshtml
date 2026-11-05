@@ -1,202 +1,165 @@
-﻿@model ShoppingCartVM 
-
-
+@model ShoppingCartVM
 @{
-    var itemCount = Model.ShoppingCartList.Count();
+    ViewData["Title"] = "Your cart";
+    var items = Model.ShoppingCartList.ToList();
+    var units = items.Sum(i => i.Count);
 }
 
-
-<div class="container py-4" style="max-width: 1140px;">
-    <form method="post">
-                <a href="#" class="text-decoration-none text-secondary small fw-medium d-inline-flex align-items-center gap-1 mb-3">
-            <i class="bi bi-arrow-left"></i> Continue Shopping
+<div class="container py-4" style="max-width:1140px">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+        <div>
+            <h1 class="h3 fw-bold mb-0">Shopping cart</h1>
+            <span class="text-secondary">@units @(units == 1 ? "item" : "items")</span>
+        </div>
+        <a asp-area="Customer" asp-controller="Home" asp-action="Index" class="text-decoration-none fw-semibold">
+            <i class="bi bi-arrow-left me-1"></i>Continue shopping
         </a>
+    </div>
 
-        <div class="row g-4 align-items-start">
+    @if (items.Count == 0)
+    {
+        <div class="bb-empty">
+            <i class="bi bi-cart-x"></i>
+            <h5 class="fw-bold mt-3">Your cart is empty</h5>
+            <p class="text-secondary mb-3">Find something to read and it will show up here.</p>
+            <a asp-area="Customer" asp-controller="Home" asp-action="Index" class="btn btn-brand">Browse books</a>
+        </div>
+    }
+    else
+    {
+        <form method="post" id="checkoutForm">
+            @* Default button for the Enter key, so Enter never triggers a +/- button below *@
+            <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Place order</button>
 
-            <!-- ============ LEFT: Items ============ -->
-            <div class="col-lg-7">
-                <div class="card border shadow-sm overflow-hidden">
-                    <div class="card-header text-white d-flex align-items-center justify-content-between py-3 px-4" style="background: linear-gradient(to right, #065f46, #282828, #191414);">
-                        <h5 class="mb-0 fw-bold"><i class="bi bi-bag me-2"></i>Your Items</h5>
-                        <span class="badge rounded-pill bg-white bg-opacity-25 text-white">@itemCount</span>
-                    </div>
-
-                    @if(itemCount== 0){
-                        <div class="text-center py-5">
-                            <i class="bi bi-cart-x display-4 text-secondary"></i>
-                            <p class="text-secondary mt-3 mb-0" >Your cart is empty</p>
-                        </div>
-                    }
-                        else
+            <div class="row g-4 align-items-start">
+                <div class="col-lg-7">
+                    <div class="card overflow-hidden" style="border-radius:var(--bb-radius)">
+                        @foreach (var item in items)
                         {
-                            <div class="cart-items-scroll">
-                            @foreach (var items in Model.ShoppingCartList)
+                            var nextHint = "";
+                            if (item.Count <= 50 && item.Product.Price50 < item.Price)
                             {
-                                <div class="d-flex gap-3 px-4 py-3 border-bottom cart-item">
-                                    <!-- Thumbnail -->
-                                    <a href="#" class="flex-shrink-0">
-                                        <div class="rounded overflow-hidden" style="width: 56px; height: 72px;">
-                                                @if (!string.IsNullOrEmpty(items.Product.ImageUrl))
-                                                {
-                                                   <img src="@Url.Content("~/" + items.Product.ImageUrl.TrimStart('/'))"
-                                                     class="w-100 h-100"
-                                                     style="object-fit: cover;"
-                                                     alt="@items.Product.Title" />
-                                                }
-                                                else
-                                                {
-                                                       <img src="https://placehold.co/56x72"
-                                                         class="w-100 h-100"
-                                                         style="object-fit: cover;"
-                                                         alt="Product" />
-                                                }
-                                        </div>
-                                    </a>
-
-                                    <!-- Info -->
-                                    <div class="flex-grow-1" style="min-width: 0;">
-                                        <a href="#" class="fw-semibold text-decoration-none d-block text-truncate" style="font-size: 0.85rem;">
-                                            @items.Product.Title
-                                        </a>
-                                        <p class="text-secondary mb-2" style="font-size: 0.7rem;">by @items.Product.Author &middot; @items.Price.ToString("c") each</p>
-
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="input-group" style="width: 130px;">
-                                                <a asp-action="Minus" asp-route-cartId="@items.Id" class="btn btn-outline-secondary btn-sm px-2"><i class="bi bi-dash"></i></a>
-                                                <input type="number" value="@items.Count" min="1"
-                                                       class="form-control form-control-sm text-center fw-bold"
-                                                       style="min-width: 52px;"
-                                                       onchange="updateCart(@items.Id, this.value)" />
-                                                <a asp-action="Plus" asp-route-cartId="@items.Id" class="btn btn-outline-success btn-sm px-2"><i class="bi bi-plus-lg"></i></a>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Price + Remove -->
-                                    <div class="text-end flex-shrink-0 d-flex flex-column justify-content-between align-self-stretch">
-                                        <span class="fw-bold" style="font-size: 0.9rem;">@((items.Price * items.Count).ToString("c"))</span>
-                                        <a asp-action="Remove" asp-route-cartId="@items.Id" class="text-danger text-decoration-none d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;">
-                                            <i class="bi bi-trash3"></i> Remove
-                                        </a>
-                                    </div>
-                                </div>
+                                nextHint = $"Add {51 - item.Count} more to pay {item.Product.Price50.ToString("c")} each";
                             }
-
-                           
-
-                        </div>
-                        }
-                        
-                </div>
-            </div>
-
-            <!-- ============ RIGHT: Checkout sidebar ============ -->
-            <div class="col-lg-5">
-                <div class="position-lg-sticky" style="top: 80px;">
-                    <div class="card border shadow-sm overflow-hidden">
-
-                        <!-- Shipping -->
-                        <div class="px-4 pt-4 pb-3">
-                            <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-file-person" style="color: #17A34A;"></i> Name And Phone
-                            </h6>
-                            <div class="row g-2 mb-2">
-                                <div class="col-6">
-                                    <!-- TODO: Add input binding and validation -->
-                                    <input asp-for="OrderHeader.Name" class="form-control form-control-sm" placeholder="Full Name" />
-                                    <span asp-validation-for="OrderHeader.Name" class="text-danger" style="font-size: 0.65rem;"></span>
+                            else if (item.Count <= 100 && item.Product.Price100 < item.Price)
+                            {
+                                nextHint = $"Add {101 - item.Count} more to pay {item.Product.Price100.ToString("c")} each";
+                            }
+                            <div class="bb-cart-item">
+                                <a class="bb-cart-thumb" asp-area="Customer" asp-controller="Home" asp-action="Details" asp-route-productId="@item.ProductId">
+                                    @if (!string.IsNullOrEmpty(item.Product.ImageUrl))
+                                    {
+                                        <img src="@Url.Content("~/" + item.Product.ImageUrl.TrimStart('/'))" alt="@item.Product.Title" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <span class="d-flex h-100 align-items-center justify-content-center"><i class="bi bi-book fs-3 text-secondary"></i></span>
+                                    }
+                                </a>
+                                <div class="flex-grow-1 min-w-0">
+                                    <a class="fw-bold text-decoration-none d-block text-truncate" style="color:var(--bb-text)"
+                                       asp-area="Customer" asp-controller="Home" asp-action="Details" asp-route-productId="@item.ProductId">@item.Product.Title</a>
+                                    <div class="text-secondary small mb-2">by @item.Product.Author &middot; @item.Price.ToString("c") each</div>
+                                    @if (nextHint.Length > 0)
+                                    {
+                                        <div class="bb-hint mb-2"><i class="bi bi-lightning-charge-fill me-1"></i>@nextHint</div>
+                                    }
+                                    <div class="d-flex flex-wrap align-items-center gap-3">
+                                        <div class="bb-qty">
+                                            <button type="submit" class="bb-qty-btn" aria-label="Decrease quantity" formnovalidate
+                                                    formaction="@Url.Action("Minus", "Cart", new { area = "Customer", cartid = item.Id })"><i class="bi bi-dash-lg"></i></button>
+                                            <input type="number" min="1" max="1000" value="@item.Count" aria-label="Quantity"
+                                                   onchange="updateCart(@item.Id, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" />
+                                            <button type="submit" class="bb-qty-btn" aria-label="Increase quantity" formnovalidate
+                                                    formaction="@Url.Action("Plus", "Cart", new { area = "Customer", cartid = item.Id })"><i class="bi bi-plus-lg"></i></button>
+                                        </div>
+                                        <button type="submit" class="bb-link-danger" formnovalidate
+                                                formaction="@Url.Action("Remove", "Cart", new { area = "Customer", cartid = item.Id })"><i class="bi bi-trash3 me-1"></i>Remove</button>
+                                    </div>
                                 </div>
-                                <div class="col-6">
-                                    <input asp-for="OrderHeader.PhoneNumber" class="form-control form-control-sm" placeholder="Phone" />
-                                    <span asp-validation-for="OrderHeader.PhoneNumber" class="text-danger" style="font-size: 0.65rem;"></span>
+                                <div class="fw-bold text-nowrap">@((item.Price * item.Count).ToString("c"))</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card bb-summary" style="border-radius:var(--bb-radius)">
+                        <div class="card-body p-4">
+                            <h2 class="h6 fw-bold mb-3"><i class="bi bi-geo-alt me-2" style="color:var(--bb-brand)"></i>Shipping details</h2>
+                            <div class="row g-2 mb-2">
+                                <div class="col-12 col-sm-6">
+                                    <input asp-for="OrderHeader.Name" class="form-control" placeholder="Full name" autocomplete="name" />
+                                    <span asp-validation-for="OrderHeader.Name" class="text-danger small"></span>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <input asp-for="OrderHeader.PhoneNumber" class="form-control" placeholder="Phone" autocomplete="tel" />
+                                    <span asp-validation-for="OrderHeader.PhoneNumber" class="text-danger small"></span>
                                 </div>
                             </div>
-                            <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 pt-3">
-                                <i class="bi bi-geo-alt" style="color: #17A34A;"></i> Shipping Address
-                            </h6>
                             <div class="mb-2">
-                                <input asp-for="OrderHeader.StreetAddress" class="form-control form-control-sm" placeholder="Street Address" />
-                                <span asp-validation-for="OrderHeader.StreetAddress" class="text-danger" style="font-size: 0.65rem;"></span>
+                                <input asp-for="OrderHeader.StreetAddress" class="form-control" placeholder="Street address" autocomplete="street-address" />
+                                <span asp-validation-for="OrderHeader.StreetAddress" class="text-danger small"></span>
                             </div>
                             <div class="row g-2">
                                 <div class="col-5">
-                                   
-                                    <input asp-for="OrderHeader.City" class="form-control form-control-sm" placeholder="City" />
-                                    <span asp-validation-for="OrderHeader.City" class="text-danger" style="font-size: 0.65rem;"></span>
+                                    <input asp-for="OrderHeader.City" class="form-control" placeholder="City" />
+                                    <span asp-validation-for="OrderHeader.City" class="text-danger small"></span>
                                 </div>
                                 <div class="col-3">
-                                   
-                                    <input asp-for="OrderHeader.State" class="form-control form-control-sm" placeholder="State" />
-                                    <span asp-validation-for="OrderHeader.State" class="text-danger" style="font-size: 0.65rem;"></span>
+                                    <input asp-for="OrderHeader.State" class="form-control" placeholder="State" />
+                                    <span asp-validation-for="OrderHeader.State" class="text-danger small"></span>
                                 </div>
                                 <div class="col-4">
-                                   
-                                    <input asp-for="OrderHeader.PostalCode" class="form-control form-control-sm" placeholder="Zip Code" />
-                                    <span asp-validation-for="OrderHeader.PostalCode" class="text-danger" style="font-size: 0.65rem;"></span>
+                                    <input asp-for="OrderHeader.PostalCode" class="form-control" placeholder="ZIP" autocomplete="postal-code" />
+                                    <span asp-validation-for="OrderHeader.PostalCode" class="text-danger small"></span>
                                 </div>
                             </div>
-                        </div>
 
-                        <hr class="my-0 mx-4" />
-
-                        <!-- Summary -->
-                        <div class="px-4 py-3">
-                            <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-receipt" style="color: #17A34A;"></i> Order Summary
-                            </h6>
-                                @foreach (var items in Model.ShoppingCartList)
-                                {
-                                     <div class="d-flex justify-content-between mb-1" style="font-size: 0.8rem;">
-                                         <span class="text-secondary text-truncate me-2">@items.Product.Title &times; 1</span>
-                                    <span class="fw-medium flex-shrink-0">@((items.Price * items.Count).ToString("c"))</span>
-                                     </div>
-                                }
-                                
-                            
-                            <hr class="my-2" />
-                            <div class="d-flex justify-content-between" style="font-size: 0.8rem;">
+                            <hr class="my-4" />
+                            <h2 class="h6 fw-bold mb-3"><i class="bi bi-receipt me-2" style="color:var(--bb-brand)"></i>Order summary</h2>
+                            @foreach (var item in items)
+                            {
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-secondary text-truncate me-2">@item.Product.Title &times; @item.Count</span>
+                                    <span class="fw-medium">@((item.Price * item.Count).ToString("c"))</span>
+                                </div>
+                            }
+                            <div class="d-flex justify-content-between small mt-2">
                                 <span class="text-secondary">Shipping</span>
-                                <span class="fw-semibold" style="color: #17A34A;">Free</span>
+                                <span class="fw-semibold" style="color:var(--bb-brand-600)">Free</span>
                             </div>
-                        </div>
-
-                        <!-- Total bar -->
-                        <div class="d-flex justify-content-between align-items-center px-4 py-3 text-white" style="background: linear-gradient(to right, #065f46, #282828, #191414);">
-                            <span class="text-uppercase fw-semibold small">Total</span>
-                            <span class="fw-bold fs-5">@Model.OrderHeader.OrderTotal.ToString("c")</span>
-                        </div>
-
-                        <!-- Place Order -->
-                        <div class="p-4">
-                            <button type="submit" class="btn btn-accent w-100 fw-semibold py-2 d-flex align-items-center justify-content-center gap-2">
-                                <i class="bi bi-lock"></i> Place Order
-                            </button>
-                            <div class="d-flex justify-content-center gap-3 mt-3 text-secondary" style="font-size: 0.7rem;">
-                                <span><i class="bi bi-shield-check me-1"></i>Secure</span>
-                                <span><i class="bi bi-truck me-1"></i>Free Shipping</span>
-                                <span><i class="bi bi-arrow-counterclockwise me-1"></i>Returns</span>
+                            <hr />
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="fw-semibold">Total</span>
+                                <span class="h4 fw-bold mb-0">@Model.OrderHeader.OrderTotal.ToString("c")</span>
+                            </div>
+                            <button type="submit" class="btn btn-brand btn-lg w-100"><i class="bi bi-lock me-2"></i>Pay securely with Stripe</button>
+                            <div class="d-flex justify-content-center gap-3 mt-3 text-secondary" style="font-size:.75rem">
+                                <span><i class="bi bi-shield-check me-1"></i>Secure payment</span>
+                                <span><i class="bi bi-truck me-1"></i>Free shipping</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </form>
+        </form>
+    }
 </div>
 
 @section Scripts {
     <script>
         function updateCart(cartId, count) {
-            fetch('/Customer/Cart/UpdateCart', {
+            var token = document.querySelector('#checkoutForm input[name="__RequestVerificationToken"]');
+            fetch('@Url.Action("UpdateCart", "Cart", new { area = "Customer" })', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'cartId=' + cartId + '&count=' + count
-            }).then(response => {
-                if (response.ok) window.location.reload();
-            });
-            
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token ? token.value : ''
+                },
+                body: 'cartId=' + encodeURIComponent(cartId) + '&count=' + encodeURIComponent(count)
+            }).then(function (r) { if (r.ok) window.location.reload(); });
         }
-    </script>   
+    </script>
     <partial name="_ValidationScriptsPartial" />
 }

@@ -5,7 +5,7 @@ using BulkyBook.Utility;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Net;
 
 namespace BulkyBookWeb.Areas.Identity.Controllers
 {
@@ -16,8 +16,10 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IShoppingCartService _shoppingCartService;
-        public AccountController(UserManager<ApplicationUser> userManager , SignInManager<ApplicationUser> signInManager, RoleManager<IdentityRole> roleManager, IShoppingCartService shoppingCartService)
+        private readonly IEmailService _emailService;
+        public AccountController(UserManager<ApplicationUser> userManager , SignInManager<ApplicationUser> signInManager, RoleManager<IdentityRole> roleManager, IShoppingCartService shoppingCartService, IEmailService emailService)
         {
+            _emailService = emailService;
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
@@ -37,7 +39,7 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
             {
 
                 var result = await _signInManager.PasswordSignInAsync(loginVM.Email , loginVM.Password 
-                        , loginVM.RememberMe, lockoutOnFailure: false);
+                        , loginVM.RememberMe, lockoutOnFailure: true);
                 if (result.Succeeded)
                 {
 
@@ -54,6 +56,11 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
                         return RedirectToAction("Index", "Dashboard", new { area = "Admin" });
                     }
                     return RedirectToAction("Index", "Home", new { area = "Customer" });    
+                }
+                if (result.IsLockedOut)
+                {
+                    ModelState.AddModelError(string.Empty, "Too many failed attempts. Please try again in a few minutes.");
+                    return View(loginVM);
                 }
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");       
             }
@@ -133,11 +140,73 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
         {
             return View();
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
             HttpContext.Session.SetInt32(SD.SessionCart, 0);
             return RedirectToAction("Index", "Home", new { area = "Customer" });
         }
+
+        // ---------------------------------------------------------------- forgot / reset password
+        public IActionResult ForgotPassword() => View(new ForgotPasswordVM());
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordVM model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user != null)
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var link = Url.Action("ResetPassword", "Account", new { area = "Identity", email = user.Email, token }, Request.Scheme);
+                var body = $"<p>Hello {WebUtility.HtmlEncode(user.Name)},</p>" +
+                           $"<p>We received a request to reset your BulkyBook password.</p>" +
+                           $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Choose a new password</a></p>" +
+                           $"<p>If you did not request this, you can safely ignore this e-mail.</p>";
+                await _emailService.SendEmailAsync(user.Email!, "Reset your BulkyBook password", body);
+            }
+            // Same answer whether or not the e-mail exists (no account enumeration).
+            return RedirectToAction(nameof(ForgotPasswordConfirmation));
+        }
+
+        public IActionResult ForgotPasswordConfirmation() => View();
+
+        public IActionResult ResetPassword(string? email, string? token)
+        {
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
+            {
+                return RedirectToAction(nameof(ForgotPassword));
+            }
+            return View(new ResetPasswordTokenVM { Email = email, Token = token });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(ResetPasswordTokenVM model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+            var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+            if (result.Succeeded)
+            {
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+            return View(model);
+        }
+
+        public IActionResult ResetPasswordConfirmation() => View();
     }
 }

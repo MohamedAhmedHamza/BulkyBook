@@ -1,0 +1,27 @@
+@{
+    var code = ViewBag.StatusCode is int c ? c : 500;
+    ViewData["Title"] = code == 404 ? "Page not found" : "Something went wrong";
+    var title = code switch { 404 => "Page not found", 403 => "Access denied", 401 => "Please sign in", _ => "Something went wrong" };
+    var text = code switch
+    {
+        404 => "The page you are looking for does not exist or has been moved.",
+        403 => "You do not have permission to open this page.",
+        401 => "Please sign in to continue.",
+        _ => "An unexpected error occurred. Please try again in a moment."
+    };
+}
+<div class="bb-status">
+    <div style="max-width:460px">
+        <div class="bb-code">@code</div>
+        <h1 class="h3 fw-bold mt-2 mb-2">@title</h1>
+        <p class="text-secondary mb-4">@text</p>
+        <div class="d-flex gap-2 justify-content-center">
+            <a class="btn btn-brand" asp-area="Customer" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i>Back to shop</a>
+            <a class="btn btn-soft" href="javascript:history.back()">Go back</a>
+        </div>
+        @if (ViewBag.RequestId is string rid)
+        {
+            <p class="text-secondary small mt-4 mb-0">Reference: <code>@rid</code></p>
+        }
+    </div>
+</div>

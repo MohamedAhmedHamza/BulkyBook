@@ -1,50 +1,73 @@
-﻿    using BulkyBook.Business.Services;
-    using BulkyBook.Business.Services.IServices;
-    using BulkyBook.Models;
-    using BulkyBook.Models.ViewModels;
-    using BulkyBook.Utility;
-    using BulkyBookWeb.DataAccess.Data;
-    using Microsoft.AspNetCore.Authorization;
-    using Microsoft.AspNetCore.Mvc;
-    using Microsoft.AspNetCore.Mvc.Rendering;
-    using Stripe;
-    using System.Security.Claims;
+﻿
+using BulkyBook.Business.Services.IServices;
+using BulkyBook.Models;
+using BulkyBook.Utility;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
-    namespace BulkyBookWeb.Areas.Admin.Controllers
+namespace BulkyBookWeb.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    [Authorize]
+    public class OrderController : Controller
     {
-        [Area("Admin")]
-        [Authorize(Roles = SD.RoleAdmin)]
-        public class OrderController : Controller
+        private readonly IOrderService _orderService;
+
+        [BindProperty]
+        public OrderHeader OrderHeader { get; set; } = new();
+
+        public OrderController(IOrderService orderService)
         {
-            private readonly IOrderService _orderService;
+            _orderService = orderService;
+        }
 
+        public IActionResult Index()
+        {
+            return View();
+        }
 
-            [BindProperty]
-            public OrderHeader OrderHeader { get; set; }
-            public OrderController(IOrderService orderService)
+        public async Task<IActionResult> Details(int orderId)
+        {
+            OrderHeader = await _orderService.GetOrderByIdAsync(
+                orderId,
+                includDetail: true,
+                includeUser: true
+            );
+
+            if (OrderHeader == null)
             {
-                   _orderService = orderService;
+                return NotFound();
             }
-            [AllowAnonymous]
-            public async Task<IActionResult> Index()
+
+            var isStaff =
+                User.IsInRole(SD.RoleAdmin) ||
+                User.IsInRole(SD.RoleEmployee);
+
+            var currentUserId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier
+            );
+
+            // Customers can only view their own orders.
+            if (!isStaff && OrderHeader.ApplicationUserId != currentUserId)
             {
-                var orders = await _orderService.GetAllOrderAsync();
-                return View(orders);
+                return RedirectToAction(
+                    "AccessDenied",
+                    "Account",
+                    new { area = "Identity" }
+                );
             }
-            [AllowAnonymous]
-            public async Task<IActionResult> Details(int orderId )
-            {
-                OrderHeader = await _orderService.GetOrderByIdAsync(orderId, includDetail : true, includeUser: true);
-                return View(OrderHeader);
-            }
-            [HttpPost]
-            [Authorize(Roles = SD.RoleAdmin+ "," + SD.RoleEmployee)]
+
+            return View(OrderHeader);
+        }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [Authorize(Roles = SD.RoleAdmin + "," + SD.RoleEmployee)]
         public async Task<IActionResult> UpdateOrderDetails(OrderHeader orderHeader)
         {
-            var orderHeaderFromDb = await _orderService.GetOrderByIdAsync(orderHeader.Id);
+            var orderHeaderFromDb =
+                await _orderService.GetOrderByIdAsync(orderHeader.Id);
 
             if (orderHeaderFromDb == null)
             {
@@ -52,6 +75,7 @@
                 return RedirectToAction(nameof(Index));
             }
 
+            // Update only the allowed customer and shipping information.
             orderHeaderFromDb.Name = orderHeader.Name;
             orderHeaderFromDb.PhoneNumber = orderHeader.PhoneNumber;
             orderHeaderFromDb.StreetAddress = orderHeader.StreetAddress;
@@ -59,14 +83,12 @@
             orderHeaderFromDb.State = orderHeader.State;
             orderHeaderFromDb.PostalCode = orderHeader.PostalCode;
 
-            if (!(string.IsNullOrEmpty(orderHeader.Carrier)
-                && orderHeaderFromDb.OrderStatus == SD.StatusShipped))
+            if (!string.IsNullOrEmpty(orderHeader.Carrier))
             {
                 orderHeaderFromDb.Carrier = orderHeader.Carrier;
             }
 
-            if (!(string.IsNullOrEmpty(orderHeader.TrackingNumber)
-                && orderHeaderFromDb.OrderStatus == SD.StatusShipped))
+            if (!string.IsNullOrEmpty(orderHeader.TrackingNumber))
             {
                 orderHeaderFromDb.TrackingNumber = orderHeader.TrackingNumber;
             }
@@ -75,131 +97,164 @@
 
             TempData["success"] = "Order details updated successfully!";
 
-            return RedirectToAction(nameof(Details),
-                new { orderId = orderHeaderFromDb.Id });
+            return RedirectToAction(
+                nameof(Details),
+                new { orderId = orderHeaderFromDb.Id }
+            );
         }
 
         [HttpPost]
-            [Authorize(Roles = SD.RoleAdmin + "," + SD.RoleEmployee)]
-            public async Task<IActionResult> UpdateOrderStatus(string status)
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = SD.RoleAdmin + "," + SD.RoleEmployee)]
+        public async Task<IActionResult> UpdateOrderStatus(string status)
+        {
+            if (OrderHeader == null || OrderHeader.Id <= 0)
             {
-                var orderHeader = await _orderService.GetOrderByIdAsync(OrderHeader.Id);
-                if (orderHeader == null)
-                {
-                    TempData["error"] = "Order not found!";
-                    return RedirectToAction("Index");
-                }
-                string successMessage;
-                switch (status)
-                {
-                    case SD.StatusInProcess:
-                        await _orderService.UpdateOrderStatusAsync(orderHeader.Id, status);
-                        successMessage = "Order processing started successfully.";
-                        break;
-                    case SD.StatusShipped:
-                        if (string.IsNullOrEmpty(OrderHeader.Carrier) || string.IsNullOrEmpty(OrderHeader.TrackingNumber))
-                        {
-                            TempData["error"] = "Carrier and Tracking Number must be provided before shipping the order.";
-                            return RedirectToAction("Details", "Order", new { orderId = orderHeader.Id });
-                        }
-                        await _orderService.UpdateOrderStatusAsync(orderHeader.Id,SD.StatusShipped,OrderHeader.Carrier ,OrderHeader.TrackingNumber);
-                        successMessage = "Order shipped successfully.";
-                        break;
-                    case SD.StatusCancelled:
-                    case SD.StatusRefunded:
-                        try
-                        {
-                            bool refundIssued = await _orderService.CancelOrderWithRefundAsync(OrderHeader.Id);
-                            if (refundIssued)
-                            {
-                                successMessage = "Order cancelled and refund issued successfully. Funds will be returns to customer within 5-10 business";
-                            }
-                            else
-                            {
-                                successMessage = "Order cancelled successfully.(No paymeny was processed)";
-                            }
-                        }
-                        catch (InvalidOperationException ex)
-                        {
-                            TempData["error"] = ex.Message;
-                            return RedirectToAction(nameof(Details),new {order = orderHeader.Id});
-                        }
-                        catch(StripeException ex)
-                        {
-                            TempData["error"] = $"Order cancelled but refund faild:{ex.Message}.Please refund manually in Stripe Dashboard";
-                            return RedirectToAction(nameof(Details), new { order = orderHeader.Id });
-
-                        }
-                        break;
-                    default:
-                        TempData["error"] = "Invalid status provided.";
-                        return RedirectToAction("Details", "Order", new { orderId = orderHeader.Id });
-                }
-                TempData["success"] = successMessage;
-                return RedirectToAction( "Details", "Order", new { orderId = orderHeader.Id }
-    );
+                TempData["error"] = "Invalid order information!";
+                return RedirectToAction(nameof(Index));
             }
-            /*public async Task<IActionResult> Update(int? id)
+
+            var orderHeader =
+                await _orderService.GetOrderByIdAsync(OrderHeader.Id);
+
+            if (orderHeader == null)
             {
-                if (id == null || id == 0)
-                {
-                    return NotFound();
-                }
-                var Product =  await _ProductService.GetProductByIdAsync(id.Value);
-                if (Product == null)
-                {
-                    return NotFound();
-                }
-                return View(Product);
+                TempData["error"] = "Order not found!";
+                return RedirectToAction(nameof(Index));
             }
-            [HttpPost]
-            [ValidateAntiForgeryToken]
-            [ActionName("Update")]
-            public async Task<IActionResult> UpdatePost(Product Product)
-            {
-            
-                if (ModelState.IsValid)
-                {
-                    await _ProductService.UpdateProductAsync(Product);
-                    TempData["success"] = "Product updated successfully!";
-                    return RedirectToAction("Index");
-                }
-                return View(Product);
-            }
-            public async Task<IActionResult> Delete (int? id)
-            {
-                if (id == null || id == 0)
-                {
-                    return NotFound();
-                }
-                var Product = await _ProductService.GetProductByIdAsync(id.Value);
-                if (Product == null)
-                {
-                    return NotFound();
-                }
-                return View(Product);
-            }*/
 
+            string successMessage;
 
-            #region API CALLS
-            [AllowAnonymous]
-            public async Task<IActionResult> Getall(string status)
+            switch (status)
             {
-                string? userId = null;
+                case SD.StatusInProcess:
 
-                if(!User.IsInRole(SD.RoleAdmin) && !User.IsInRole(SD.RoleEmployee))
-                {
-                    var calimIdentity = (ClaimsIdentity)User.Identity;
-                    userId = calimIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                    if(string.IsNullOrEmpty(userId))
+                    await _orderService.UpdateOrderStatusAsync(
+                        orderHeader.Id,
+                        status
+                    );
+
+                    successMessage = "Order processing started successfully.";
+                    break;
+
+                case SD.StatusShipped:
+
+                    if (string.IsNullOrWhiteSpace(OrderHeader.Carrier) ||
+                        string.IsNullOrWhiteSpace(OrderHeader.TrackingNumber))
                     {
-                        return Unauthorized();
-                    }
-                }
-                var orders= await _orderService.GetAllOrderAsync(userId,status);
-                return Json(new { data = orders });
-            }
-            #endregion
+                        TempData["error"] =
+                            "Carrier and Tracking Number must be provided before shipping the order.";
 
+                        return RedirectToAction(
+                            nameof(Details),
+                            new { orderId = orderHeader.Id }
+                        );
+                    }
+
+                    await _orderService.UpdateOrderStatusAsync(
+                        orderHeader.Id,
+                        SD.StatusShipped,
+                        OrderHeader.Carrier,
+                        OrderHeader.TrackingNumber
+                    );
+
+                    successMessage = "Order shipped successfully.";
+                    break;
+
+                case SD.StatusCancelled:
+                case SD.StatusRefunded:
+
+                    try
+                    {
+                        bool refundIssued =
+                            await _orderService.CancelOrderWithRefundAsync(
+                                orderHeader.Id
+                            );
+
+                        if (refundIssued)
+                        {
+                            successMessage =
+                                "Order cancelled and refund request submitted successfully.";
+                        }
+                        else
+                        {
+                            successMessage =
+                                "Order cancelled successfully. No payment was processed.";
+                        }
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // The service may wrap Stripe errors in this exception.
+                        TempData["error"] = ex.Message;
+
+                        return RedirectToAction(
+                            nameof(Details),
+                            new { orderId = orderHeader.Id }
+                        );
+                    }
+                    catch (Stripe.StripeException)
+                    {
+                        // Do not claim the order was cancelled when the refund fails.
+                        TempData["error"] =
+                            "The refund could not be processed. The order status was not changed. Please check Stripe Dashboard.";
+
+                        return RedirectToAction(
+                            nameof(Details),
+                            new { orderId = orderHeader.Id }
+                        );
+                    }
+
+                    break;
+
+                default:
+
+                    TempData["error"] = "Invalid status provided.";
+
+                    return RedirectToAction(
+                        nameof(Details),
+                        new { orderId = orderHeader.Id }
+                    );
+            }
+
+            TempData["success"] = successMessage;
+
+            return RedirectToAction(
+                nameof(Details),
+                new { orderId = orderHeader.Id }
+            );
         }
+
+        #region API CALLS
+
+        [HttpGet]
+        public async Task<IActionResult> Getall(string status)
+        {
+            string? userId = null;
+
+            var isStaff =
+                User.IsInRole(SD.RoleAdmin) ||
+                User.IsInRole(SD.RoleEmployee);
+
+            if (!isStaff)
+            {
+                userId = User.FindFirstValue(
+                    ClaimTypes.NameIdentifier
+                );
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized();
+                }
+            }
+
+            var orders = await _orderService.GetAllOrderAsync(
+                userId,
+                status
+            );
+
+            return Json(new { data = orders });
+        }
+
+        #endregion
     }
+}

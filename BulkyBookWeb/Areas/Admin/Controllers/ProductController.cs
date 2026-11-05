@@ -172,7 +172,7 @@ namespace BulkyBookWeb.Areas.Admin.Controllers
                 var imagePath = Path.Combine(_webHostEnvironment.WebRootPath, productToBeDeleted.ImageUrl.TrimStart('\\','/'));
                 if (System.IO.File.Exists(imagePath))
                 {
-                    System.IO.File.Exists(imagePath); 
+                    System.IO.File.Delete(imagePath);
                 }
             }
 

@@ -1,49 +1,39 @@
 @using Microsoft.AspNetCore.Identity
 @using BulkyBook.Models
-
+@using BulkyBook.Utility
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 
-<ul class="navbar-nav">
-
-    @if (SignInManager.IsSignedIn(User))
-    {
-        <li class="nav-item">
-            <a class="nav-link text-dark">
-                Hello @UserManager.GetUserName(User)!
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <form asp-area="Identity"
-                  asp-controller="Account"
-                  asp-action="Logout"
-                  method="post">
-                <button class="nav-link btn btn-link text-dark border-0">
-                    Logout
-                </button>
-            </form>
-        </li>
-    }
-    else
-    {
-        <li class="nav-item">
-            <a class="nav-link text-dark"
-               asp-area="Identity"
-               asp-controller="Account"
-               asp-action="Register">
-                Register
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link text-dark"
-               asp-area="Identity"
-               asp-controller="Account"
-               asp-action="Login">
-                Login
-            </a>
-        </li>
-    }
-
-</ul>
+@if (SignInManager.IsSignedIn(User))
+{
+    var userName = UserManager.GetUserName(User) ?? "User";
+    var initial = userName.Length > 0 ? userName.Substring(0, 1) : "U";
+    var isStaff = User.IsInRole(SD.RoleAdmin) || User.IsInRole(SD.RoleEmployee);
+    <div class="dropdown">
+        <button class="bb-userbtn dropdown-toggle border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="bb-avatar">@initial</span>
+            <span class="d-none d-md-inline text-truncate" style="max-width:130px">@userName</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end bb-dropdown">
+            <li class="px-3 py-2 small text-secondary text-truncate">@userName</li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+                <a class="dropdown-item" asp-area="Admin" asp-controller="Order" asp-action="Index">
+                    <i class="bi bi-box-seam me-2"></i>@(isStaff ? "Orders" : "My Orders")
+                </a>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+                <form asp-area="Identity" asp-controller="Account" asp-action="Logout" method="post">
+                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+}
+else
+{
+    <a class="btn btn-sm btn-soft text-white border-secondary-subtle d-none d-sm-inline-flex" style="background:rgba(255,255,255,.06);color:#fff"
+       asp-area="Identity" asp-controller="Account" asp-action="Login">Login</a>
+    <a class="btn btn-sm btn-brand" asp-area="Identity" asp-controller="Account" asp-action="Register">Register</a>
+}

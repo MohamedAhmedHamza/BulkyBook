@@ -1,228 +1,249 @@
-using BulkyBook.Business.Services.IServices;
+﻿using BulkyBook.Business.Services.IServices;
 using BulkyBook.Models;
 using BulkyBook.Models.ViewModels;
 using BulkyBook.Utility;
-using Mailjet.Client.Resources;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
-using Stripe.Checkout;
 using System.Security.Claims;
 
 namespace BulkyBookWeb.Areas.Customer.Controllers
 {
     [Area("Customer")]
+    [Authorize]
     public class CartController : Controller
     {
+        private const int MaxQty = 1000;
+
         private readonly IOrderService _orderService;
         private readonly IShoppingCartService _shoppingCartService;
         private readonly IApplicationUserService _applicationUserService;
-        private readonly IEmailService _emailService;   
-        public CartController(IOrderService orderService ,IShoppingCartService shoppingCartService,IApplicationUserService applicationUserService,IEmailService emailService)
+        private readonly IEmailService _emailService;
+        private readonly ILogger<CartController> _logger;
+
+        public CartController(IOrderService orderService, IShoppingCartService shoppingCartService,
+            IApplicationUserService applicationUserService, IEmailService emailService, ILogger<CartController> logger)
         {
             _orderService = orderService;
             _shoppingCartService = shoppingCartService;
             _applicationUserService = applicationUserService;
             _emailService = emailService;
+            _logger = logger;
         }
 
+        private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // ---------------------------------------------------------------- cart page
         public async Task<IActionResult> Index()
         {
-            var claimsIdentity = (ClaimsIdentity)User.Identity;
-            var userId = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Challenge();
             var user = await _applicationUserService.GetUserByIdAsync(userId);
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
-            var cartItems = await _shoppingCartService.GetUserCartItemsAsync(userId);
-            ShoppingCartVM shoppingCartVM = new ShoppingCartVM
-            {
-                ShoppingCartList = cartItems,
-                OrderHeader = new OrderHeader()
-            };
-            shoppingCartVM.OrderHeader.applicationUser = user;
-            shoppingCartVM.OrderHeader.ApplicationUserId = userId;
-            shoppingCartVM.OrderHeader.Name = user.Name;
-            shoppingCartVM.OrderHeader.PhoneNumber = user.PhoneNumber;
-            shoppingCartVM.OrderHeader.StreetAddress = user.StreetAddress;
-            shoppingCartVM.OrderHeader.City = user.City;
-            shoppingCartVM.OrderHeader.State = user.State;
-            shoppingCartVM.OrderHeader.PostalCode = user.PostalCode;
+            if (user == null) return Challenge();
 
-            foreach (var cart in shoppingCartVM.ShoppingCartList)
-            {
-                shoppingCartVM.OrderHeader.OrderTotal += (cart.Product.Price * cart.Count);
-            }
-
-            return View(shoppingCartVM);
+            return View(await BuildCartVmAsync(userId, user, posted: null));
         }
+
+        private async Task<ShoppingCartVM> BuildCartVmAsync(string userId, ApplicationUser user, OrderHeader? posted)
+        {
+            var items = (await _shoppingCartService.GetUserCartItemsAsync(userId)).ToList();
+            var header = new OrderHeader
+            {
+                ApplicationUserId = userId,
+                applicationUser = user,
+                Name = posted?.Name ?? user.Name,
+                PhoneNumber = posted?.PhoneNumber ?? user.PhoneNumber ?? string.Empty,
+                StreetAddress = posted?.StreetAddress ?? user.StreetAddress ?? string.Empty,
+                City = posted?.City ?? user.City ?? string.Empty,
+                State = posted?.State ?? user.State ?? string.Empty,
+                PostalCode = posted?.PostalCode ?? user.PostalCode ?? string.Empty,
+                OrderTotal = items.Sum(c => c.Price * c.Count)   // tiered price
+            };
+            return new ShoppingCartVM { ShoppingCartList = items, OrderHeader = header };
+        }
+
+        // ---------------------------------------------------------------- checkout
         [HttpPost]
         [ActionName("Index")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> IndexPOST(ShoppingCartVM shoppingCartVM)
         {
-            var claimsIdentity = (ClaimsIdentity)User.Identity;
-            var userId = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Challenge();
             var user = await _applicationUserService.GetUserByIdAsync(userId);
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
-            var cartItems = await _shoppingCartService.GetUserCartItemsAsync(userId);
-            shoppingCartVM.ShoppingCartList = cartItems;
-            shoppingCartVM.OrderHeader.OrderDate = DateTime.UtcNow;
-            shoppingCartVM.OrderHeader.ApplicationUserId = userId;
-            
+            if (user == null) return Challenge();
 
-            foreach (var cart in shoppingCartVM.ShoppingCartList)
+            var cartItems = (await _shoppingCartService.GetUserCartItemsAsync(userId)).ToList();
+            if (cartItems.Count == 0)
             {
-                shoppingCartVM.OrderHeader.OrderTotal += (cart.Product.Price * cart.Count);
+                TempData["error"] = "Your cart is empty.";
+                return RedirectToAction(nameof(Index));
             }
-            shoppingCartVM.OrderHeader.OrderStatus = SD.StatusPending;
-            shoppingCartVM.OrderHeader.OrderDetails = shoppingCartVM.ShoppingCartList.Select(cart => new OrderDetails
+
+            var posted = shoppingCartVM?.OrderHeader ?? new OrderHeader();
+            var invalid = false;
+            void Require(string? value, string field, string label)
             {
-                ProductId = cart.ProductId,
-                Count = cart.Count,
-                Price = cart.Product.Price
-            }).ToList();
-            await _orderService.CreateOrderAsync(shoppingCartVM.OrderHeader);
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    invalid = true;
+                    ModelState.AddModelError("OrderHeader." + field, label + " is required.");
+                }
+            }
+            Require(posted.Name, nameof(OrderHeader.Name), "Name");
+            Require(posted.PhoneNumber, nameof(OrderHeader.PhoneNumber), "Phone");
+            Require(posted.StreetAddress, nameof(OrderHeader.StreetAddress), "Street address");
+            Require(posted.City, nameof(OrderHeader.City), "City");
+            Require(posted.State, nameof(OrderHeader.State), "State");
+            Require(posted.PostalCode, nameof(OrderHeader.PostalCode), "Postal code");
+            if (invalid)
+            {
+                return View(await BuildCartVmAsync(userId, user, posted));
+            }
+
+            // Build the order from trusted data only (never bind status/total/tracking from the form).
+            var header = new OrderHeader
+            {
+                ApplicationUserId = userId,
+                Name = posted.Name.Trim(),
+                PhoneNumber = posted.PhoneNumber.Trim(),
+                StreetAddress = posted.StreetAddress.Trim(),
+                City = posted.City.Trim(),
+                State = posted.State.Trim(),
+                PostalCode = posted.PostalCode.Trim(),
+                OrderDate = DateTime.UtcNow,
+                OrderStatus = SD.StatusPending,
+                OrderTotal = cartItems.Sum(c => c.Price * c.Count),
+                OrderDetails = cartItems.Select(c => new OrderDetails
+                {
+                    ProductId = c.ProductId,
+                    Count = c.Count,
+                    Price = c.Price
+                }).ToList()
+            };
+            var created = await _orderService.CreateOrderAsync(header);
 
             try
             {
                 var domain = Request.Scheme + "://" + Request.Host.Value;
-
-                var sessionUrl = await _orderService.CreateStripeCheckoutSessionAsync(shoppingCartVM.OrderHeader, shoppingCartVM.ShoppingCartList, domain);
-                await _shoppingCartService.ClearAsCartAsync(userId);
-                HttpContext.Session.SetInt32(SD.SessionCart, 0);
+                var sessionUrl = await _orderService.CreateStripeCheckoutSessionAsync(created, cartItems, domain);
+                // The cart is cleared only AFTER payment is confirmed (see OrderConfirmation / webhook).
                 Response.Headers.Append("Location", sessionUrl);
-                return new StatusCodeResult(303); // Redirect to Stripe Checkout
+                return new StatusCodeResult(303);
             }
             catch (StripeException ex)
             {
-                TempData["Error"] = "Payment processing failed. Please try again.";
+                _logger.LogError(ex, "Stripe checkout failed for order {OrderId}", created.Id);
+                await _orderService.CancelPendingOrderAsync(created.Id);
+                TempData["error"] = "Payment processing failed. Your cart is still saved - please try again.";
                 return RedirectToAction(nameof(Index));
             }
-
         }
+
         public async Task<IActionResult> OrderConfirmation(int id)
         {
-            var orderHeader = await _orderService.GetOrderByIdAsync(id, includeUser: true, includDetail: true);
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Challenge();
 
-            if (orderHeader == null)
-            {
-                return NotFound();
-            }
-            var claimsIdentity = (ClaimsIdentity)User.Identity;
-            var userId = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var user = await _applicationUserService.GetUserByIdAsync(userId);
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
-            if (orderHeader.ApplicationUserId != userId)
+            var order = await _orderService.GetOrderByIdAsync(id, includeUser: true);
+            if (order == null) return NotFound();
+            if (order.ApplicationUserId != userId)
             {
                 return RedirectToAction("AccessDenied", "Account", new { area = "Identity" });
             }
+
+            var paid = false;
             try
             {
-                var result = await _orderService.VerifyStripePaymentAsync(orderHeader);
-                if (result)
+                var result = await _orderService.VerifyStripePaymentAsync(order);
+                paid = result.IsPaid;
+                if (result.NewlyApproved)
                 {
-                    TempData["success"] = "Payment complete successflly. Your Order has been confirmed";
+                    await AfterPaymentAsync(order, userId);
                 }
-                else
-                {
-                    TempData["error"] = "Unable to verify payment status. Please contact support with your order number";
-                }
-
             }
             catch (StripeException ex)
             {
-                TempData["Error"] = "Payment confirmation failed. Please contact support.";
+                _logger.LogError(ex, "Could not verify payment for order {OrderId}", id);
             }
-                await _emailService.SendOrderConfirmationEmailAsync(
-               user.Email,
-               orderHeader.Id,
-               (decimal)orderHeader.OrderTotal);
 
+            ViewBag.Paid = paid;
             return View(id);
         }
-        public async Task<IActionResult> Plus(int cartid)
-          {
-            var cart = await _shoppingCartService.GetCartByIdAsync(cartid);
-            if (cart != null)
-            {
-                if (cart.Count == 1000)
-                {
-                    // do nothing or show a message that the maximum limit has been reached
-                }
-                else
-                {
-                    cart.Count++;
-                    await _shoppingCartService.UpdateCartAsync(cart);
-                    await UpdateCartSessionAsync();
 
-                }
-
-            }
-                return RedirectToAction(nameof(Index));
-          }
-        public async Task<IActionResult> Minus(int cartid)
+        private async Task AfterPaymentAsync(OrderHeader order, string userId)
         {
-            var cart = await _shoppingCartService.GetCartByIdAsync(cartid);
-            if (cart != null)
+            await _shoppingCartService.ClearAsCartAsync(userId);
+            HttpContext.Session.SetInt32(SD.SessionCart, 0);
+            try
             {
-                cart.Count--;
-                await _shoppingCartService.UpdateCartAsync(cart);
-                await UpdateCartSessionAsync();
+                var email = order.applicationUser?.Email;
+                if (!string.IsNullOrEmpty(email))
+                {
+                    await _emailService.SendOrderConfirmationEmailAsync(email, order.Id, (decimal)order.OrderTotal);
+                }
             }
-            return RedirectToAction(nameof(Index));
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Confirmation e-mail failed for order {OrderId}", order.Id);
+            }
         }
+
+        // ---------------------------------------------------------------- cart item actions (POST + antiforgery + ownership)
+        [HttpPost, ValidateAntiForgeryToken]
+        public Task<IActionResult> Plus(int cartid) => ChangeAsync(cartid, +1);
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public Task<IActionResult> Minus(int cartid) => ChangeAsync(cartid, -1);
+
+        [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Remove(int cartid)
         {
             var cart = await _shoppingCartService.GetCartByIdAsync(cartid);
-            if (cart != null)
+            if (cart != null && cart.ApplicationUserId == CurrentUserId)
             {
-                cart.Count = 0 ;
+                cart.Count = 0;
+                await _shoppingCartService.UpdateCartAsync(cart);
+                await UpdateCartSessionAsync();
+                TempData["success"] = "Item removed from your cart.";
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateCart(int cartId, int count)
+        {
+            var cart = await _shoppingCartService.GetCartByIdAsync(cartId);
+            if (cart == null || cart.ApplicationUserId != CurrentUserId)
+            {
+                return NotFound();
+            }
+            cart.Count = Math.Min(count, MaxQty);   // < 1 removes the line (handled by the service)
+            await _shoppingCartService.UpdateCartAsync(cart);
+            await UpdateCartSessionAsync();
+            return Ok(new { success = true });
+        }
+
+        private async Task<IActionResult> ChangeAsync(int cartId, int delta)
+        {
+            var cart = await _shoppingCartService.GetCartByIdAsync(cartId);
+            if (cart != null && cart.ApplicationUserId == CurrentUserId)
+            {
+                cart.Count = Math.Clamp(cart.Count + delta, 0, MaxQty);
                 await _shoppingCartService.UpdateCartAsync(cart);
                 await UpdateCartSessionAsync();
             }
             return RedirectToAction(nameof(Index));
         }
-        public async Task<IActionResult> updateCart(int cartId, int count)
-        {
-            var cart = await _shoppingCartService.GetCartByIdAsync(cartId);
-            if (cart == null)
-            {
-                return NotFound();
-            }
-            if(count <= 1)
-            {
-                cart.Count = 0;
-            }
-            else
-            {
-                if(count >= 1000)
-                    cart.Count = 1000;
-                else
-                    cart.Count = count;
-            }   
-                await _shoppingCartService.UpdateCartAsync(cart);
-            await UpdateCartSessionAsync();
-            return Ok(new {success =true});
-        }  
+
         private async Task UpdateCartSessionAsync()
         {
-            var calimIdentity = (ClaimsIdentity)User.Identity;
-            var userId = calimIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (! string.IsNullOrEmpty(userId))
+            var userId = CurrentUserId;
+            if (!string.IsNullOrEmpty(userId))
             {
-                var Count = await _shoppingCartService.GetCartCountAsync(userId);
-                HttpContext.Session.SetInt32(SD.SessionCart, Count);
+                var count = await _shoppingCartService.GetCartCountAsync(userId);
+                HttpContext.Session.SetInt32(SD.SessionCart, count);
             }
-
-            
         }
     }
 }

@@ -1,11 +1,10 @@
-using BulkyBook.Business.Services;
+﻿using BulkyBook.Business.Services;
 using BulkyBook.Business.Services.IServices;
 using BulkyBook.DataAccess.DbInitializer;
 using BulkyBook.Models;
 using BulkyBookWeb.DataAccess.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,6 +62,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 Stripe.StripeConfiguration.ApiKey = builder.Configuration.GetSection("Stripe:SecretKey").Get<string>();
+// Friendly 404/403/500 pages (Customer/Home/Error)
+app.UseStatusCodePagesWithReExecute("/Home/Error", "?code={0}");
+
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseSession();
