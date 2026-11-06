@@ -225,11 +225,23 @@
     <!-- Initialize Quill editor -->
     <script>
         const quill = new Quill('#quill-editor', {
-        theme: 'snow'
-        });
-        const TextAreaDesc = document.querySelector('tesxtarea[name="Product.Description"]');
-        if(TextAreaDesc.value)quill.root.innerHTML= TextAreaDesc.value;
-        quill.on('text-change',()=> TextAreaDesc.value = quill.root.innerHTML);
+    theme: 'snow'
+});
+
+const TextAreaDesc = document.querySelector(
+    'textarea[name="Product.Description"]'
+);
+
+if (TextAreaDesc) {
+
+    if (TextAreaDesc.value) {
+        quill.root.innerHTML = TextAreaDesc.value;
+    }
+
+    quill.on('text-change', () => {
+        TextAreaDesc.value = quill.root.innerHTML;
+    });
+}
     </script>
     
 }

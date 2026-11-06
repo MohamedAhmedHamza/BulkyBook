@@ -1,133 +1,149 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+@using BulkyBook.Utility
+@using Microsoft.EntityFrameworkCore
+@inject BulkyBookWeb.DataAccess.Data.ApplicationDbContext Db
+@{
+    var ctrl = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLower();
+    var titles = new Dictionary<string, string> { ["dashboard"] = "Dashboard", ["order"] = "Orders", ["product"] = "Products", ["category"] = "Categories", ["user"] = "Users" };
+    var pageTitle = ViewData["Title"] as string ?? (titles.TryGetValue(ctrl, out var tt) ? tt : "Admin");
+    var rawName = User.Identity?.Name ?? "Admin";
+    var shortName = rawName.Contains('@') ? rawName.Substring(0, rawName.IndexOf('@')) : rawName;
+    var initial = shortName.Length > 0 ? shortName.Substring(0, 1) : "A";
+    var toPack = await Db.OrderHeaders.CountAsync(o => o.OrderStatus == SD.StatusApproved);
+    var greeting = ViewData["Greeting"] as bool? ?? false;
+}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - BulkyBookWeb</title>
-    <script type="importmap"></script>
+    <title>@pageTitle · BulkyBook Admin</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('au-theme') || localStorage.getItem('bb-theme') || 'dark';
+                document.documentElement.setAttribute('data-bs-theme', t);
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.css" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.8/css/dataTables.dataTables.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.css" asp-append-version="true" />
-    <link rel="stylesheet" href="//cdn.datatables.net/2.3.8/css/dataTables.dataTables.min.css" asp-append-version="true" />
-
+    <link rel="stylesheet" href="~/css/aurora.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/BulkyBookWeb.styles.css" asp-append-version="true" />
-    <style>
-        body {
-        font-family: 'Inter', system-ui, sans-serif;
-        background: #f8f9fa;
-        }
-
-        .admin-sidebar {
-        width: 240px;
-        background: #191414;
-        border-right: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .admin-sidebar-nav .nav-link {
-        color: #94a3b8;
-        font-size: 0.875rem;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.375rem;
-        text-decoration: none;
-        }
-
-        .admin-sidebar-nav .nav-link:hover {
-        color: #fff;
-        background: rgba(255,255,255,0.05);
-        }
-
-        .admin-sidebar-nav .nav-link.active {
-        color: #fff;
-        background: #17A34A;
-        }
-
-        .admin-sidebar-nav .nav-section {
-        font-size: 0.65rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-        padding: 0.5rem 0.75rem;
-        margin-top: 0.75rem;
-        }
-    </style>
-
 </head>
 <body>
-    <div class="d-lg-none sticky-top border-bottom" style="background: #191414; border-color: rgba(255,255,255,0.1) !important;">
-        <div class="d-flex align-items-center justify-content-between px-3 py-2">
-            <button class="btn btn-link text-white-50 p-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas">
-                <i class="bi bi-list fs-4"></i>
-            </button>
-            <span class="fw-semibold text-white">Admin Panel</span>
-            <button id="themeToggleMobile" class="btn btn-link text-white-50 p-0" type="button">
-                <i class="bi bi-moon-stars"></i>
-            </button>
-        </div>
-    </div>
+    <div class="au-bg" aria-hidden="true"><span class="au-orb o1"></span><span class="au-orb o2"></span><span class="au-orb o3"></span></div>
 
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarOffcanvas" style="background: #191414;">
-        <div class="offcanvas-header border-bottom" style="border-color: rgba(255,255,255,0.1) !important;">
-            <h6 class="mb-0 fw-semibold text-white">BulkyBook <small class="text-success">Admin</small></h6>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
-        </div>
-        <div class="offcanvas-body p-3">
-            <partial name="_AdminSidebarNav" />
-        </div>
-    </div>
-
-    <div class="d-flex">
-        <aside class="admin-sidebar d-none d-lg-flex flex-column position-sticky top-0" style="height: 100vh;">
-            <div class="p-3 border-bottom" style="border-color: rgba(255,255,255,0.1) !important;">
-                <h6 class="mb-0 fw-semibold text-white">BulkyBook <small class="text-success">Admin</small></h6>
+    <div class="ad-shell">
+        @* ---------- Sidebar (desktop) ---------- *@
+        <aside class="ad-sidebar glass d-none d-lg-flex">
+            <div class="ad-brand">
+                <a class="ad-brand-link" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+                    <span class="ad-logo"><i class="bi bi-book-half"></i></span>
+                    <div><b>BulkyBook</b><small>Admin studio</small></div>
+                </a>
+                <button type="button" class="ad-collapse" data-sidebar-toggle aria-label="Collapse sidebar"><i class="bi bi-layout-sidebar-inset"></i></button>
             </div>
-
-            <nav class="flex-grow-1 overflow-auto p-3">
-                <partial name="_AdminSidebarNav" />"
-
-            </nav>
-
-            <div class="border-top p-3" style="border-color: rgba(255,255,255,0.1) !important;">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <i class="bi bi-person-circle" style="color: #94a3b8;"></i>
-                    <!-- TODO: Display username -->
-                    <span class="small text-truncate flex-grow-1 text-white">@User.Identity?.Name</span>
-                    <button id="themeToggle" class="btn btn-sm btn-link p-0" style="color: #94a3b8;" type="button" title="Toggle theme">
-                        <i class="bi bi-moon-stars" id="themeIcon"></i>
-                    </button>
-                </div>
-                <div class="d-flex gap-2">
-                    <!-- TODO: Add link to store -->
-
-                    <a asp-area="Customer" asp-controller="Home" asp-action="Index" class="btn btn-sm btn-outline-light flex-grow-1">
-                        <i class="bi bi-shop"></i> Store
-                    </a>
-                    <!-- TODO: Add logout form -->
-                    <form method="post" asp-area="Identity" asp-controller="Account" asp-action="Logout">
-                        <button type="submit" class="btn btn-sm btn-accent fw-semibold">Logout</button>
+            <div class="ad-search">
+                <i class="bi bi-search"></i>
+                <input id="adSearch" type="search" placeholder="Search menu…" autocomplete="off" />
+                <kbd>Ctrl K</kbd>
+            </div>
+            <nav class="ad-nav"><partial name="_AdminSidebarNav" /></nav>
+            <div class="ad-foot">
+                <button type="button" class="ad-theme" data-theme-toggle>
+                    <span class="d-flex align-items-center gap-2"><i class="bi bi-moon-stars" data-theme-icon></i><span class="lbl">Dark mode</span></span>
+                    <span class="switch"></span>
+                </button>
+                <div class="ad-user">
+                    <span class="ad-avatar">@initial</span>
+                    <span class="ad-user-meta"><b>@shortName</b><small>@(User.IsInRole(SD.RoleAdmin) ? "Administrator" : "Employee")</small></span>
+                    <form method="post" asp-area="Identity" asp-controller="Account" asp-action="Logout" class="ms-auto lbl">
+                        <button type="submit" class="ic-btn" style="width:38px;height:38px" title="Logout" aria-label="Logout"><i class="bi bi-box-arrow-right"></i></button>
                     </form>
                 </div>
             </div>
         </aside>
 
-        <main class="flex-grow-1">
-            <div class="p-4">
-                <partial name="_Notification" />
-                @RenderBody()
+        <main class="ad-main">
+            @* ---------- Mobile top bar ---------- *@
+            <div class="ad-mobile glass">
+                <button class="ic-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-label="Menu"><i class="bi bi-list fs-5"></i></button>
+                <span class="fw-bold">BulkyBook <small class="au-grad-text">Admin</small></span>
+                <button class="ic-btn" type="button" data-theme-toggle aria-label="Toggle theme"><i class="bi bi-moon-stars" data-theme-icon></i></button>
             </div>
+            <div class="offcanvas offcanvas-start glass" tabindex="-1" id="sidebarOffcanvas">
+                <div class="offcanvas-header">
+                    <div class="ad-brand p-0"><a class="ad-brand-link" asp-area="Admin" asp-controller="Dashboard" asp-action="Index"><span class="ad-logo"><i class="bi bi-book-half"></i></span><div><b>BulkyBook</b><small>Admin studio</small></div></a></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body pt-0"><partial name="_AdminSidebarNav" /></div>
+            </div>
+
+            @* ---------- Page header ---------- *@
+            <header class="ad-top reveal">
+                <div>
+                    @if (greeting)
+                    {
+                        <h1><span data-greeting="@shortName">Welcome back, @shortName</span> 👋</h1>
+                        <div class="sub"><span class="au-dot"></span><span data-today></span><span>·</span><span>@pageTitle</span></div>
+                    }
+                    else
+                    {
+                        <h1>@pageTitle</h1>
+                        <div class="sub"><span class="au-dot"></span><span data-today></span></div>
+                    }
+                </div>
+                <div class="acts">
+                    <a class="ic-btn" asp-area="Admin" asp-controller="Order" asp-action="Index" asp-route-status="approved" title="Orders waiting to be packed" aria-label="Orders to pack">
+                        <i class="bi bi-bell"></i>
+                        @if (toPack > 0) { <span class="dot">@(toPack > 99 ? "99+" : toPack.ToString())</span> }
+                    </a>
+                    <a class="ic-btn" asp-area="Customer" asp-controller="Home" asp-action="Index" title="Open the store" aria-label="Open the store"><i class="bi bi-shop"></i></a>
+                    <a class="btn btn-brand d-none d-sm-inline-flex align-items-center gap-2 px-3" asp-area="Admin" asp-controller="Product" asp-action="Upsert"><i class="bi bi-plus-lg"></i> New product</a>
+                </div>
+            </header>
+
+            <partial name="_Toasts" />
+            @RenderBody()
         </main>
     </div>
-   
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="//cdn.datatables.net/2.3.8/js/dataTables.min.js" asp-append-version="true"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.8/js/dataTables.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/aurora.js" asp-append-version="true"></script>
+    <script>
+        toastr.options = { positionClass: 'toast-bottom-right', closeButton: true, progressBar: true, timeOut: 4000 };
+        (function () {
+            var s = document.getElementById('adSearch');
+            if (!s) return;
+            s.addEventListener('input', function () {
+                var q = s.value.trim().toLowerCase();
+                document.querySelectorAll('.ad-sidebar .ad-link').forEach(function (a) {
+                    a.style.display = (!q || a.textContent.toLowerCase().indexOf(q) > -1) ? '' : 'none';
+                });
+            });
+            s.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { var f = Array.from(document.querySelectorAll('.ad-sidebar .ad-link')).find(function (a) { return a.style.display !== 'none'; }); if (f) window.location = f.href; }
+            });
+        })();
+        // click on the logo while collapsed re-opens the sidebar
+        document.querySelector('.ad-sidebar .ad-brand')?.addEventListener('click', function (e) {
+            var shell = document.querySelector('.ad-shell');
+            if (shell.classList.contains('collapsed')) { e.preventDefault(); document.querySelector('[data-sidebar-toggle]').click(); }
+        });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

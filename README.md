@@ -1,99 +1,26 @@
-# BulkyBook – E-Commerce Web Application
+# BulkyBook – Aurora redesign (v3)
+Copy these files over the project (same paths). Nothing here touches your own edits
+(OrderController, OrderService, Product/Upsert.cshtml, Program.cs, csproj, appsettings*).
+NOT compiled (no .NET SDK in my environment) - send me any build error.
 
-## Overview
+## New files
+- wwwroot/css/aurora.css   design system (dark/light glass, aurora glow, motion, bootstrap + DataTables + SweetAlert + toastr skin)
+- wwwroot/css/admin.css    admin shell, KPI strip, panels, orders board
+- wwwroot/js/aurora.js     theme toggle, collapsible sidebar, reveal-on-scroll, count-up, spotlight
+- wwwroot/js/orders-board.js   kanban board (reads /admin/order/Getall?status=all)
 
-BulkyBook is an E-Commerce web application built using ASP.NET Core MVC. It provides an online bookstore where customers can browse products, add items to their shopping cart, and place orders.
+## Replaced files
+- Views/Shared/_AdminLayout.cshtml, _AdminSidebarNav.cshtml   (new glass sidebar, role-aware, "to pack" badge, search, Ctrl+K, collapse to icon rail)
+- Views/Shared/_Layout.cshtml, _LoginPartial.cshtml          (floating glass navbar, shared theme toggle)
+- wwwroot/css/theme.css  (store components re-skinned on Aurora tokens)
+- wwwroot/css/site.css   (ONLY change: old "Dark Theme Overrides" block removed - it fought the new theme)
+- Areas/Admin/Views/Dashboard/Index.cshtml + wwwroot/js/dashboard.js + DashboardController.cs + BulkyBook.Models/ViewModels/DaschBoardVM.cs
+- Areas/Admin/Views/Order/Index.cshtml + wwwroot/js/orders.js     (Board / Table switch, status pills)
+- Areas/Customer/Views/Home/_Hero.cshtml
+- Areas/Customer/Controllers/CartController.cs  (one line: OrderDate = DateTime.Now, same clock as the rest of your data)
 
-The application also includes an administrative area for managing products, categories, users, and orders.
-
-## Technologies Used
-
-- ASP.NET Core MVC
-- C#
-- Entity Framework Core
-- SQL Server
-- ASP.NET Core Identity
-- Bootstrap
-- JavaScript & jQuery
-- Chart.js
-- Mailjet for email services
-
-## Architecture
-
-The solution follows a layered architecture to separate responsibilities and improve maintainability.
-
-- **BulkyBook.Models:** Contains application models and ViewModels.
-- **BulkyBook.DataAccess:** Handles database operations, Entity Framework Core, repositories, and Unit of Work.
-- **BulkyBook.Business:** Contains business logic and application services.
-- **BulkyBook.Utility:** Contains shared constants and helper classes.
-- **BulkyBookWeb:** The ASP.NET Core MVC web application.
-
-## Main Features
-
-### Customer Features
-- User registration and login.
-- Browse products and categories.
-- View product details.
-- Add and remove products from the shopping cart.
-- Update shopping cart quantities.
-- Checkout and place orders.
-- View order information.
-
-### Admin Features
-- Manage products (Create, Read, Update, Delete).
-- Manage categories.
-- Manage users and roles.
-- View and manage customer orders.
-- Update order status and tracking information.
-- View dashboard statistics and charts.
-
-### Additional Features
-- Authentication and authorization using ASP.NET Core Identity.
-- Role-based access control.
-- Password reset functionality.
-- Email notifications.
-- Product image upload.
-- Different product prices based on order quantity.
-
-## Getting Started
-
-### Prerequisites
-
-- .NET SDK compatible with the project.
-- SQL Server.
-- Visual Studio.
-- SQL Server Management Studio (SSMS).
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/MohamedAhmedHamza/BulkyBook.git
-   ```
-
-2. Open the solution in Visual Studio.
-
-3. Configure your database connection string in your local configuration.
-
-4. Configure the required email service settings if you want to use email functionality.
-
-5. Apply Entity Framework Core migrations:
-
-   ```bash
-   Update-Database
-   ```
-
-6. Build and run the application.
-
-## Security
-
-Sensitive configuration files, database credentials, API keys, and publishing profiles are excluded from the Git repository.
-
-Configure your own local settings before running the application.
-
-## Author
-
-**Mohamed Ahmed Hamza**
-
-GitHub: [MohamedAhmedHamza](https://github.com/MohamedAhmedHamza)
+## Behaviour notes
+- Revenue now counts Approved + Processing + Shipped (before: Approved + Shipped only).
+- Orders board is read-only (cards open the order page). Status changes still go through your OrderController.
+- Users link in the sidebar is shown to Admin only.
+- All other admin pages (Products, Categories, Users, Order details, Upsert) are restyled by CSS only - markup untouched.

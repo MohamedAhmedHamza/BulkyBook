@@ -66,6 +66,7 @@ Stripe.StripeConfiguration.ApiKey = builder.Configuration.GetSection("Stripe:Sec
 app.UseStatusCodePagesWithReExecute("/Home/Error", "?code={0}");
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 app.UseSession();
 

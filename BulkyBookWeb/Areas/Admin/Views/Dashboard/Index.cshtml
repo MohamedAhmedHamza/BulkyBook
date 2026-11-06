@@ -1,119 +1,143 @@
-﻿@model DaschBoardVM
-<div class="mb-4">
-    <h1 class="h4 fw-bold">Welcome back! 👋</h1>
-    <p class="text-secondary small mb-0">Here's what's happening with your store.</p>
-</div>
+@model DaschBoardVM
+@using BulkyBook.Utility
+@{
+    ViewData["Title"] = "Dashboard";
+    string Chip(double? pct, string note)
+    {
+        if (pct == null) return $"<span class=\"delta flat\">—</span><span class=\"k-note\">{note}</span>";
+        var up = pct >= 0;
+        return $"<span class=\"delta {(up ? "up" : "down")}\"><i class=\"bi bi-arrow-{(up ? "up" : "down")}-short\"></i>{Math.Abs(pct.Value):0.#}%</span><span class=\"k-note\">{note}</span>";
+    }
+    string Initials(string n) => string.Join("", (n ?? "?").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]));
+    var maxUnits = Model.TopProducts.Count > 0 ? Model.TopProducts.Max(t => t.Units) : 1;
+}
 
-<!-- Stats Cards -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card border shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #dbeafe;">
-                        <i class="bi bi-currency-dollar" style="color: #3b82f6;"></i>
-                    </div>
-                    <span class="text-uppercase fw-semibold text-secondary" style="font-size: 0.6rem; letter-spacing: 0.05em;">Revenue</span>
-                </div>
-                <p class="h4 fw-bold mb-0">@Model.TotalRevenue</p>
-                <p class="text-secondary mb-0" style="font-size: 0.75rem;">From approved orders</p>
-            </div>
-        </div>
+@* ================= KPI strip ================= *@
+<section class="kpi-strip glass spot reveal mb-4">
+    <div class="kpi">
+        <div class="k-label"><i class="bi bi-lightning-charge-fill"></i>Today so far</div>
+        <div class="k-value" data-count="@Model.TodayRevenue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="$" data-decimals="0">$0</div>
+        <div>@Html.Raw(Chip(Model.TodayDelta, "vs yesterday"))</div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <a asp-controller="Order" asp-action="Index" class="card border shadow-sm h-100 text-decoration-none">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #d1fae5;">
-                        <i class="bi bi-truck" style="color: #10b981;"></i>
-                    </div>
-                    <span class="text-uppercase fw-semibold text-secondary" style="font-size: 0.6rem; letter-spacing: 0.05em;">Orders</span>
-                </div>
-                <p class="h4 fw-bold text-dark mb-0">@Model.TotalOrders</p>
-                <p class="text-secondary mb-0" style="font-size: 0.75rem;">View all orders &rarr;</p>
-            </div>
-        </a>
+    <div class="kpi">
+        <div class="k-label"><i class="bi bi-graph-up-arrow"></i>Last 7 days</div>
+        <div class="k-value" data-count="@Model.Last7Revenue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="$" data-decimals="0">$0</div>
+        <div>@Html.Raw(Chip(Model.RevenueDelta, "vs the week before"))</div>
+        <canvas class="k-spark" id="sparkRevenue" width="220" height="80"></canvas>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <a asp-controller="Product" asp-action="Index" class="card border shadow-sm h-100 text-decoration-none">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #f3e8ff;">
-                        <i class="bi bi-book" style="color: #8b5cf6;"></i>
-                    </div>
-                    <span class="text-uppercase fw-semibold text-secondary" style="font-size: 0.6rem; letter-spacing: 0.05em;">Products</span>
-                </div>
-                <p class="h4 fw-bold text-dark mb-0">@Model.TotalProducts</p>
-                <p class="text-secondary mb-0" style="font-size: 0.75rem;">Manage products &rarr;</p>
-            </div>
-        </a>
+    <div class="kpi">
+        <div class="k-label"><i class="bi bi-bag"></i>Orders today</div>
+        <div class="k-value" data-count="@Model.OrdersToday" data-decimals="0">0</div>
+        <div>@Html.Raw(Chip(Model.OrdersDelta, "vs yesterday"))</div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <a asp-controller="User" asp-action="Index" class="card border shadow-sm h-100 text-decoration-none">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #fef3c7;">
-                        <i class="bi bi-people" style="color: #f59e0b;"></i>
-                    </div>
-                    <span class="text-uppercase fw-semibold text-secondary" style="font-size: 0.6rem; letter-spacing: 0.05em;">Users</span>
-                </div>
-                <p class="h4 fw-bold text-dark mb-0">@Model.TotalUsers</p>
-                <p class="text-secondary mb-0" style="font-size: 0.75rem;">Manage users &rarr;</p>
-            </div>
-        </a>
-    </div>
-</div>
+    <a class="kpi text-decoration-none" style="color:inherit" asp-controller="Order" asp-action="Index" asp-route-status="approved">
+        <div class="k-label"><i class="bi bi-box-seam"></i>Waiting to pack</div>
+        <div class="k-value" data-count="@Model.AwaitingPack" data-decimals="0">0</div>
+        <div><span class="delta @(Model.AwaitingPack > 0 ? "down" : "up")">@(Model.AwaitingPack > 0 ? "Action needed" : "All clear")</span><span class="k-note">@Model.PendingPayment awaiting payment</span></div>
+    </a>
+</section>
 
-<!-- Charts Row 1 -->
-<div class="row g-3 mb-4">
-    <div class="col-lg-6">
-        <div class="card border shadow-sm">
-            <div class="card-body">
-                <h6 class="fw-semibold mb-3"><i class="bi bi-graph-up me-1" style="color: #3b82f6;"></i> Revenue Trend</h6>
-                <div style="height: 250px;">
-                    <canvas id="revenueChart"></canvas>
+@* ================= Sales studio + status ================= *@
+<div class="row g-4 mb-4">
+    <div class="col-xl-8">
+        <section class="panel glass spot reveal">
+            <div class="panel-head">
+                <div>
+                    <h2>Sales studio</h2>
+                    <p><span id="rangeTotal" class="fw-bold" style="color:var(--au-text)">—</span> <span id="rangeDelta"></span></p>
+                </div>
+                <div class="seg" id="rangeSeg">
+                    <button type="button" data-range="7d">7D</button>
+                    <button type="button" data-range="30d" class="active">30D</button>
+                    <button type="button" data-range="6m">6M</button>
+                    <button type="button" data-range="12m">12M</button>
                 </div>
             </div>
-        </div>
+            <div class="chart-box"><canvas id="salesChart"></canvas></div>
+        </section>
     </div>
-    <div class="col-lg-6">
-        <div class="card border shadow-sm">
-            <div class="card-body">
-                <h6 class="fw-semibold mb-3"><i class="bi bi-bar-chart me-1" style="color: #10b981;"></i> Orders Per Month</h6>
-                <div style="height: 250px;">
-                    <canvas id="ordersChart"></canvas>
-                </div>
-            </div>
-        </div>
+    <div class="col-xl-4">
+        <section class="panel glass spot reveal">
+            <div class="panel-head"><div><h2>Order status</h2><p>@Model.TotalOrders orders overall</p></div></div>
+            <div class="chart-box sm d-flex justify-content-center"><canvas id="statusChart"></canvas></div>
+            <div id="statusLegend" class="mt-3 d-grid gap-2"></div>
+        </section>
     </div>
 </div>
 
-<!-- Charts Row 2 -->
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card border shadow-sm">
-            <div class="card-body">
-                <h6 class="fw-semibold mb-3"><i class="bi bi-circle-half me-1" style="color: #f59e0b;"></i> Order Status</h6>
-                <div style="height: 200px;" class="d-flex align-items-center justify-content-center">
-                    <canvas id="statusChart"></canvas>
-                </div>
-            </div>
-        </div>
+@* ================= Lists ================= *@
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <section class="panel glass spot reveal">
+            <div class="panel-head"><div><h2>Packing queue</h2><p>@Model.AwaitingPack @(Model.AwaitingPack == 1 ? "order" : "orders") paid and waiting</p></div><a class="panel-link" asp-controller="Order" asp-action="Index" asp-route-status="approved">Board →</a></div>
+            @if (Model.PackingQueue.Count == 0)
+            {
+                <div class="empty-s"><i class="bi bi-check2-circle"></i>Nothing to pack. Nice work!</div>
+            }
+            @for (var i = 0; i < Model.PackingQueue.Count; i++)
+            {
+                var o = Model.PackingQueue[i];
+                <a class="li-row" asp-controller="Order" asp-action="Details" asp-route-orderId="@o.Id">
+                    <span class="av c@(i % 4 + 1)">@Initials(o.Name)</span>
+                    <span class="li-main"><b>@o.Name</b><small>#@o.Id · @o.Date.ToString("MMM d, h:mm tt")</small></span>
+                    <span class="li-amt">@o.Total.ToString("C")</span>
+                </a>
+            }
+        </section>
     </div>
-    <div class="col-md-6">
-        <div class="card border shadow-sm">
-            <div class="card-body">
-                <h6 class="fw-semibold mb-3"><i class="bi bi-tags me-1" style="color: #8b5cf6;"></i> Products by Category</h6>
-                <div style="height: 200px;" class="d-flex align-items-center justify-content-center">
-                    <canvas id="categoryChart"></canvas>
+    <div class="col-lg-4">
+        <section class="panel glass spot reveal">
+            <div class="panel-head"><div><h2>Best sellers</h2><p>By units sold (paid orders)</p></div><a class="panel-link" asp-controller="Product" asp-action="Index">Products →</a></div>
+            @if (Model.TopProducts.Count == 0)
+            {
+                <div class="empty-s"><i class="bi bi-trophy"></i>No sales yet</div>
+            }
+            @for (var i = 0; i < Model.TopProducts.Count; i++)
+            {
+                var t = Model.TopProducts[i];
+                <div class="li-row">
+                    <span class="rank @(i == 0 ? "r1" : "")">@(i + 1)</span>
+                    <span class="li-main"><b>@t.Title</b><small>@t.Author</small><div class="mini-bar"><i data-w="@((int)Math.Round(100.0 * t.Units / maxUnits))"></i></div></span>
+                    <span class="li-amt text-end">@t.Units<small class="d-block text-secondary fw-normal" style="font-size:.7rem">sold</small></span>
                 </div>
-            </div>
-        </div>
+            }
+        </section>
+    </div>
+    <div class="col-lg-4">
+        <section class="panel glass spot reveal">
+            <div class="panel-head"><div><h2>Catalog by category</h2><p>@Model.TotalProducts products · @Model.TotalUsers users</p></div><a class="panel-link" asp-controller="Category" asp-action="Index">Categories →</a></div>
+            <div id="categoryBars" class="d-grid gap-3"></div>
+        </section>
     </div>
 </div>
 
-@section Scripts{
-    <script src="/js/dashboard.js" asp-append-version="true">
+@* ================= Recent orders ================= *@
+<section class="panel glass spot reveal">
+    <div class="panel-head"><div><h2>Recent orders</h2><p>Latest activity in your store</p></div><a class="panel-link" asp-controller="Order" asp-action="Index">All orders →</a></div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Status</th><th class="text-end">Total</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var o in Model.RecentOrders)
+                {
+                    <tr>
+                        <td class="fw-bold">#@o.Id</td>
+                        <td>@o.Name</td>
+                        <td class="text-secondary">@o.Date.ToString("MMM d, h:mm tt")</td>
+                        <td><span class="pill pill-@o.Status.ToLower()">@o.Status</span></td>
+                        <td class="text-end fw-bold">@o.Total.ToString("C")</td>
+                        <td class="text-end"><a class="btn btn-sm btn-soft" asp-controller="Order" asp-action="Details" asp-route-orderId="@o.Id">Open</a></td>
+                    </tr>
+                }
+                @if (Model.RecentOrders.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-secondary py-4">No orders yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
-    </script>
+@section Scripts {
+    <script src="~/js/dashboard.js" asp-append-version="true"></script>
 }

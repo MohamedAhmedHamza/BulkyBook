@@ -111,7 +111,7 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
                 City = posted.City.Trim(),
                 State = posted.State.Trim(),
                 PostalCode = posted.PostalCode.Trim(),
-                OrderDate = DateTime.UtcNow,
+                OrderDate = DateTime.Now,
                 OrderStatus = SD.StatusPending,
                 OrderTotal = cartItems.Sum(c => c.Price * c.Count),
                 OrderDetails = cartItems.Select(c => new OrderDetails

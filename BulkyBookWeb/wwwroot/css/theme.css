@@ -1,38 +1,24 @@
 /* ==========================================================
-   BulkyBook – Design System (theme.css)
-   Load AFTER bootstrap + site.css.  Light / Dark via
-   <html data-bs-theme="light|dark">  (Bootstrap 5.3 native).
+   BulkyBook – Store components (theme.css)
+   Re-skinned on top of Aurora (aurora.css must load first).
+   Old --bb-* tokens now point to Aurora tokens.
    ========================================================== */
-
 :root {
-    --bb-bg: #f5f7f6;
-    --bb-surface: #ffffff;
-    --bb-surface-2: #f0f3f1;
-    --bb-text: #131815;
-    --bb-muted: #667069;
-    --bb-border: #e3e8e5;
-    --bb-brand: #16a34a;
-    --bb-brand-600: #138a3e;
-    --bb-brand-soft: #e6f6ec;
-    --bb-ink: #0f1512;
-    --bb-radius: 14px;
-    --bb-radius-sm: 10px;
-    --bb-shadow-sm: 0 1px 2px rgba(15,21,18,.06), 0 1px 3px rgba(15,21,18,.05);
-    --bb-shadow-md: 0 10px 30px -12px rgba(15,21,18,.28);
-    --bb-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic", "Helvetica Neue", Arial, sans-serif;
-}
-
-[data-bs-theme="dark"] {
-    --bb-bg: #0d110f;
-    --bb-surface: #161b18;
-    --bb-surface-2: #1d2420;
-    --bb-text: #e9eeea;
-    --bb-muted: #9aa69f;
-    --bb-border: #28312c;
-    --bb-brand-soft: #12301f;
-    --bb-ink: #080b09;
-    --bb-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
-    --bb-shadow-md: 0 14px 34px -14px rgba(0,0,0,.7);
+    --bb-bg: var(--au-bg);
+    --bb-surface: var(--au-surface);
+    --bb-surface-2: var(--au-surface-strong);
+    --bb-text: var(--au-text);
+    --bb-muted: var(--au-muted);
+    --bb-border: var(--au-border);
+    --bb-brand: var(--au-accent);
+    --bb-brand-600: var(--au-accent-2);
+    --bb-brand-soft: rgba(124, 108, 255, .16);
+    --bb-ink: #0a0e1c;
+    --bb-radius: 22px;
+    --bb-radius-sm: 14px;
+    --bb-shadow-sm: var(--au-shadow);
+    --bb-shadow-md: var(--au-shadow);
+    --bb-font: var(--au-font);
 }
 
 html { scroll-behavior: smooth; }
@@ -198,3 +184,72 @@ a { color: var(--bb-brand-600); }
 .bb-status-icon.warn { background: linear-gradient(135deg, #f59e0b, #f97316); box-shadow: 0 18px 40px -16px rgba(245,158,11,.7); }
 .bb-status-icon.err { background: linear-gradient(135deg, #ef4444, #f97316); box-shadow: 0 18px 40px -16px rgba(239,68,68,.6); }
 .bb-code { font-size: clamp(4rem, 14vw, 7rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; background: linear-gradient(135deg, #16a34a, #4ade80); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+
+/* ==========================================================
+   AURORA overrides (glass / glow / motion)
+   ========================================================== */
+header.sticky-top { top: .75rem; z-index: 1030; padding: 0 .75rem; }
+.bb-nav { max-width: 1260px; margin: .75rem auto 0; border-radius: 28px; padding: .5rem .85rem; background: var(--au-surface); border: 1px solid var(--au-border);
+    -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); box-shadow: var(--au-shadow); }
+@media (min-width: 992px) { .bb-nav { border-radius: 999px; } }
+.bb-nav .container { max-width: 100%; padding-inline: .25rem; }
+.bb-brand { color: var(--au-text); }
+.bb-brand:hover { color: var(--au-text); }
+.bb-brand span b { background: var(--au-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bb-brand-logo { background: var(--au-grad); box-shadow: 0 10px 24px -10px rgba(124,108,255,.9), inset 0 1px 0 rgba(255,255,255,.35); }
+.bb-brand-logo img { filter: brightness(0) invert(1); }
+.bb-nav .nav-link { color: var(--au-muted); }
+.bb-nav .nav-link:hover { color: var(--au-text); background: var(--au-surface-strong); }
+.bb-nav .nav-link.active { color: #fff; background: var(--au-grad); box-shadow: 0 10px 24px -12px rgba(124,108,255,1); }
+.bb-iconbtn { background: var(--au-surface); border-color: var(--au-border); color: var(--au-text); transition: all .3s var(--au-ease); }
+.bb-iconbtn:hover { background: var(--au-surface-strong); border-color: var(--au-accent); color: var(--au-accent-2); transform: translateY(-2px); }
+.bb-badge { background: var(--au-rose); border-color: var(--au-bg); }
+.bb-avatar { background: var(--au-grad-warm); color: #2b1300; }
+.bb-userbtn { color: var(--au-text); background: var(--au-surface); border-color: var(--au-border) !important; }
+.bb-userbtn:hover, .bb-userbtn.show { background: var(--au-surface-strong); color: var(--au-text); }
+.navbar-toggler { border: 1px solid var(--au-border); border-radius: 12px; padding: .35rem .55rem; }
+.navbar-toggler:focus { box-shadow: 0 0 0 .2rem rgba(124,108,255,.3); }
+.navbar-toggler-icon { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%2398a2c3' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e"); }
+.bb-dropdown { border-radius: 18px !important; box-shadow: var(--au-shadow); }
+.bb-dropdown .dropdown-item:hover { background: var(--au-surface-strong); color: var(--au-accent-2); }
+
+/* hero */
+.bb-hero { background: transparent; color: var(--au-text); margin: 1.25rem .75rem 0; border-radius: 36px; border: 1px solid var(--au-border); overflow: hidden;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); max-width: 1260px; margin-inline: auto; }
+.bb-hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(700px 360px at 85% 0%, rgba(124,108,255,.32), transparent 60%), radial-gradient(560px 320px at 0% 100%, rgba(34,211,238,.18), transparent 60%); pointer-events: none; }
+.bb-hero::after { background-image: radial-gradient(var(--au-grid) 1px, transparent 1px); }
+.bb-eyebrow { color: var(--au-accent-2); background: rgba(34,211,238,.10); border-color: rgba(34,211,238,.28); }
+.bb-hero h1 { color: var(--au-text); }
+.bb-hero h1 em { background: var(--au-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bb-stat b { color: var(--au-text); } .bb-stat span { color: var(--au-faint); }
+.bb-cover { border-color: var(--au-border-strong); background: var(--au-surface-strong); animation: au-bob 7s ease-in-out infinite; }
+.bb-cover:nth-child(2) { animation-delay: -2.2s; } .bb-cover:nth-child(3) { animation-delay: -4.4s; }
+@keyframes au-bob { 0%,100% { translate: 0 0; } 50% { translate: 0 -12px; } }
+
+/* catalog */
+.bb-toolbar { border-radius: 22px; }
+.bb-chip { background: var(--au-surface); backdrop-filter: blur(10px); }
+.bb-chip:hover { border-color: var(--au-accent); color: var(--au-accent-2); }
+.bb-chip.active { background: var(--au-grad); border-color: transparent; color: #fff; box-shadow: 0 10px 22px -12px rgba(124,108,255,1); }
+.bb-product { background: var(--au-surface); border-color: var(--au-border); backdrop-filter: blur(18px); border-radius: 24px; transition: transform .4s var(--au-ease), box-shadow .4s, border-color .4s; }
+.bb-product:hover { transform: translateY(-8px) rotate(-.4deg); border-color: var(--au-border-strong); box-shadow: 0 34px 70px -30px rgba(124,108,255,.65), var(--au-shadow); }
+.bb-product-save { background: var(--au-grad-warm); color: #2b1300; }
+.bb-price { color: var(--au-text); } .bb-bulk { color: var(--au-emerald); }
+.bb-pagination .active span { background: var(--au-grad); border-color: transparent; color: #fff; }
+.bb-pagination a:hover { border-color: var(--au-accent); color: var(--au-accent-2); }
+.bb-empty { background: var(--au-surface); border-color: var(--au-border-strong); border-radius: 26px; }
+.bb-tier.active { border-color: var(--au-accent); background: rgba(124,108,255,.16); }
+.bb-detail { background: var(--au-surface); backdrop-filter: blur(20px); border-radius: 30px; }
+.bb-detail-media { background: radial-gradient(circle at 30% 20%, rgba(124,108,255,.28), transparent 70%), var(--au-surface-strong); }
+.bb-qty { background: var(--au-surface); }
+.bb-hint { color: var(--au-emerald); }
+.bb-status-icon { background: var(--au-grad); box-shadow: 0 18px 40px -16px rgba(124,108,255,.8); }
+.bb-status-icon.warn { background: var(--au-grad-warm); } .bb-status-icon.err { background: linear-gradient(135deg, #fb7185, #f43f5e); }
+.bb-code { background: var(--au-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bb-auth-card { background: var(--au-surface); backdrop-filter: blur(24px); border-radius: 30px; }
+.bb-auth-icon { background: rgba(124,108,255,.18); color: var(--au-accent-2); }
+.bb-auth-foot { background: var(--au-surface-strong); }
+.bb-footer { background: var(--au-surface); color: var(--au-muted); border-top: 1px solid var(--au-border); backdrop-filter: blur(18px); }
+.bb-footer a { color: var(--au-muted); } .bb-footer a:hover { color: var(--au-text); } .bb-footer .text-white { color: var(--au-text) !important; }
+.bb-footer .bb-avatar { background: var(--au-grad); color: #fff; }

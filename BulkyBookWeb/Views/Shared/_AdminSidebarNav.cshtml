@@ -1,24 +1,34 @@
-﻿<div class="admin-sidebar-nav">
-    <p class="nav-section mb-1">Overview</p>
-    <!-- TODO: Add navigation links with active class logic -->
-    <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index" class="nav-link d-flex align-items-center gap-2">
-        <i class="bi bi-graph-up"></i> Dashboard
+@using BulkyBook.Utility
+@using Microsoft.EntityFrameworkCore
+@inject BulkyBookWeb.DataAccess.Data.ApplicationDbContext Db
+@{
+    var ctrl = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLower();
+    string Active(string c) => ctrl == c ? "active" : "";
+    var toPack = await Db.OrderHeaders.CountAsync(o => o.OrderStatus == SD.StatusApproved);
+}
+<div class="ad-section">Overview</div>
+<a asp-area="Admin" asp-controller="Dashboard" asp-action="Index" class="ad-link @Active("dashboard")" title="Dashboard">
+    <i class="bi bi-grid-1x2"></i><span class="lbl">Dashboard</span>
+</a>
+<div class="ad-section">Commerce</div>
+<a asp-area="Admin" asp-controller="Order" asp-action="Index" class="ad-link @Active("order")" title="Orders">
+    <i class="bi bi-bag-check"></i><span class="lbl">Orders</span>
+    @if (toPack > 0) { <span class="nb">@toPack</span> }
+</a>
+<a asp-area="Admin" asp-controller="Product" asp-action="Index" class="ad-link @Active("product")" title="Products">
+    <i class="bi bi-book"></i><span class="lbl">Products</span>
+</a>
+<a asp-area="Admin" asp-controller="Category" asp-action="Index" class="ad-link @Active("category")" title="Categories">
+    <i class="bi bi-tags"></i><span class="lbl">Categories</span>
+</a>
+@if (User.IsInRole(SD.RoleAdmin))
+{
+    <div class="ad-section">Management</div>
+    <a asp-area="Admin" asp-controller="User" asp-action="Index" class="ad-link @Active("user")" title="Users">
+        <i class="bi bi-people"></i><span class="lbl">Users</span>
     </a>
-
-    <p class="nav-section mb-1">Commerce</p>
-    <a asp-area="Admin" asp-controller="Order" asp-action="Index" class="nav-link d-flex align-items-center gap-2">
-        <i class="bi bi-truck"></i> Orders
-    </a>
-    <a asp-area="Admin" asp-controller="Product" asp-action="Index" class="nav-link d-flex align-items-center gap-2">
-        <i class="bi bi-book"></i> Products
-    </a>
-    <a asp-area="Admin" asp-controller="Category" asp-action="Index" class="nav-link d-flex align-items-center gap-2">
-        <i class="bi bi-tags"></i> Categories
-    </a>
-
-    <!-- TODO: Show Management section only for Admin role -->
-    <p class="nav-section mb-1">Management</p>
-    <a asp-area="Admin" asp-controller="User" asp-action="Index" class="nav-link d-flex align-items-center gap-2">
-        <i class="bi bi-people"></i> Users
-    </a>
-</div>
+}
+<div class="ad-section">Shortcuts</div>
+<a asp-area="Customer" asp-controller="Home" asp-action="Index" class="ad-link" title="Open the store">
+    <i class="bi bi-shop"></i><span class="lbl">View store</span>
+</a>
