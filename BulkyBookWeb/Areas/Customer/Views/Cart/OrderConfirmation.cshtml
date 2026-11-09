@@ -4,7 +4,9 @@
     var paid = ViewBag.Paid is bool b && b;
 }
 
-<div class="bb-status">
+<partial name="_CheckoutSteps" model="3" />
+
+<div class="bb-status" style="min-height:50vh">
     <div style="width:100%;max-width:460px">
         @if (paid)
         {

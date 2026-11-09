@@ -1,0 +1,147 @@
+@model CheckoutVM
+@{
+    ViewData["Title"] = "Payment";
+    var o = Model.Order;
+    var lines = o.OrderDetails?.ToList() ?? new List<OrderDetails>();
+}
+<partial name="_CheckoutSteps" model="2" />
+
+<div class="container pay-wrap">
+    <div class="row g-4 align-items-start">
+        @* ---------------- payment ---------------- *@
+        <div class="col-lg-7 order-2 order-lg-1">
+            <section class="pay-card glass reveal in">
+                <div class="pay-head">
+                    <h1>Payment</h1>
+                    <span class="pay-secure"><i class="bi bi-shield-lock-fill"></i>Encrypted &middot; powered by Stripe</span>
+                </div>
+
+                @if (Model.IsTestMode)
+                {
+                    <div class="pay-test">
+                        <i class="bi bi-info-circle-fill mt-1"></i>
+                        <div><b>Test mode.</b> Use card <code>4242 4242 4242 4242</code>, any future date and any 3-digit CVC. No real money is charged.</div>
+                    </div>
+                }
+
+                <form id="payment-form" novalidate>
+                    <div id="payment-element">
+                        <div class="pay-skel"><div class="au-skeleton"></div><div class="au-skeleton"></div><div class="au-skeleton" style="height:54px;width:60%"></div></div>
+                    </div>
+                    <div id="payment-message" class="pay-error" role="alert" hidden></div>
+                    <button type="submit" id="pay-btn" class="btn btn-brand btn-lg w-100 pay-btn" disabled>
+                        <span id="pay-spin" class="spinner-border spinner-border-sm" hidden></span>
+                        <i class="bi bi-lock-fill" id="pay-lock"></i>
+                        <span id="pay-label">Pay @o.OrderTotal.ToString("C")</span>
+                    </button>
+                </form>
+
+                <div class="pay-trust">
+                    <span><i class="bi bi-shield-check"></i>Card details never touch our servers</span>
+                    <span><i class="bi bi-arrow-repeat"></i>Refundable if cancelled</span>
+                    <span><i class="bi bi-truck"></i>Free shipping</span>
+                </div>
+            </section>
+            <p class="text-center mt-3 mb-0"><a asp-controller="Cart" asp-action="Index" class="text-secondary text-decoration-none small"><i class="bi bi-arrow-left me-1"></i>Back to cart</a></p>
+        </div>
+
+        @* ---------------- order summary ---------------- *@
+        <div class="col-lg-5 order-1 order-lg-2">
+            <aside class="sum-card glass reveal in">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h6 fw-bold mb-0">Order summary</h2>
+                    <span class="text-secondary small">#@o.Id</span>
+                </div>
+                @foreach (var line in lines)
+                {
+                    <div class="sum-item">
+                        <span class="sum-thumb">
+                            @if (!string.IsNullOrEmpty(line.Product?.ImageUrl))
+                            {
+                                <img src="@Url.Content("~/" + line.Product!.ImageUrl.TrimStart('/'))" alt="" loading="lazy" />
+                            }
+                            <span class="sum-qty">@line.Count</span>
+                        </span>
+                        <span class="sum-info"><b>@line.Product?.Title</b><small>@line.Price.ToString("C") each</small></span>
+                        <span class="fw-bold">@((line.Price * line.Count).ToString("C"))</span>
+                    </div>
+                }
+                <div class="sum-ship">
+                    <b><i class="bi bi-geo-alt me-1" style="color:var(--au-accent-2)"></i>Shipping to</b>
+                    @o.Name<br />@o.StreetAddress, @o.City, @o.State @o.PostalCode<br /><span class="text-secondary">@o.PhoneNumber</span>
+                </div>
+                <div class="sum-row"><span>Subtotal</span><span>@o.OrderTotal.ToString("C")</span></div>
+                <div class="sum-row"><span>Shipping</span><span style="color:#34d399;font-weight:700">Free</span></div>
+                <div class="sum-total"><span>Total</span><span>@o.OrderTotal.ToString("C")</span></div>
+            </aside>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        (function () {
+            var stripe = Stripe(@Json.Serialize(Model.PublishableKey));
+            var clientSecret = @Json.Serialize(Model.ClientSecret);
+            var dark = function () { return (document.documentElement.getAttribute('data-bs-theme') || 'dark') === 'dark'; };
+
+            function appearance() {
+                var d = dark();
+                return {
+                    theme: d ? 'night' : 'stripe',
+                    variables: {
+                        colorPrimary: '#7c6cff', colorBackground: d ? '#151b33' : '#ffffff', colorText: d ? '#eef1fb' : '#151a33',
+                        colorTextSecondary: d ? '#98a2c3' : '#5d668c', colorDanger: '#fb7185',
+                        fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif', borderRadius: '14px', spacingUnit: '4px', fontSizeBase: '15px'
+                    },
+                    rules: {
+                        '.Input': { border: '1px solid ' + (d ? 'rgba(255,255,255,.14)' : 'rgba(99,102,241,.25)'), boxShadow: 'none', padding: '13px 14px' },
+                        '.Input:focus': { border: '1px solid #7c6cff', boxShadow: '0 0 0 3px rgba(124,108,255,.28)' },
+                        '.Label': { fontWeight: '600', fontSize: '13px' },
+                        '.Tab': { border: '1px solid ' + (d ? 'rgba(255,255,255,.14)' : 'rgba(99,102,241,.25)'), boxShadow: 'none' },
+                        '.Tab--selected': { border: '1px solid #7c6cff', boxShadow: '0 0 0 3px rgba(124,108,255,.25)' },
+                        '.Block': { boxShadow: 'none' }
+                    }
+                };
+            }
+
+            var elements = stripe.elements({
+                clientSecret: clientSecret,
+                appearance: appearance(),
+                fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap' }]
+            });
+            var paymentElement = elements.create('payment', {
+                layout: 'tabs',
+                defaultValues: { billingDetails: { name: @Json.Serialize(Model.Order.Name), email: @Json.Serialize(Model.CustomerEmail), phone: @Json.Serialize(Model.Order.PhoneNumber) } }
+            });
+            paymentElement.mount('#payment-element');
+
+            var btn = document.getElementById('pay-btn'), msg = document.getElementById('payment-message');
+            paymentElement.on('ready', function () { btn.disabled = false; });
+            document.addEventListener('au:theme', function () { elements.update({ appearance: appearance() }); });
+
+            function loading(on) {
+                btn.disabled = on;
+                document.getElementById('pay-spin').hidden = !on;
+                document.getElementById('pay-lock').hidden = on;
+                document.getElementById('pay-label').textContent = on ? 'Processing…' : 'Pay @Model.Order.OrderTotal.ToString("C")';
+            }
+            function showError(t) { msg.textContent = t; msg.hidden = !t; }
+
+            document.getElementById('payment-form').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                showError(''); loading(true);
+                var res = await stripe.confirmPayment({
+                    elements: elements,
+                    confirmParams: { return_url: @Json.Serialize(Model.ReturnUrl), receipt_email: @Json.Serialize(Model.CustomerEmail) }
+                });
+                // Only reached when there is an immediate error (otherwise Stripe redirects to return_url).
+                if (res.error) {
+                    showError(res.error.type === 'card_error' || res.error.type === 'validation_error' ? res.error.message : 'Something went wrong. Please try again.');
+                }
+                loading(false);
+            });
+        })();
+    </script>
+}

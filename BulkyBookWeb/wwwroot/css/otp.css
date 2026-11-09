@@ -1,0 +1,59 @@
+﻿
+/* ---------- OTP boxes - Force one horizontal row ---------- */
+
+#otpBoxes {
+    display: grid !important;
+    grid-template-columns: repeat(6, 52px) !important;
+    grid-template-rows: 58px !important;
+    grid-auto-flow: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8px !important;
+    direction: ltr !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+}
+
+    #otpBoxes input.otp-box {
+        display: block !important;
+        width: 52px !important;
+        min-width: 52px !important;
+        max-width: 52px !important;
+        height: 58px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        text-align: center !important;
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
+        border-radius: 12px !important;
+        border: 1.5px solid var(--au-border-strong, rgba(255,255,255,.18)) !important;
+        background: var(--au-input, rgba(255,255,255,.06)) !important;
+        color: var(--au-text, #fff) !important;
+        outline: none;
+        caret-color: var(--au-accent, #7c6cff);
+        transition: border-color .2s, box-shadow .2s, transform .2s;
+    }
+
+        #otpBoxes input.otp-box:focus {
+            border-color: var(--au-accent, #7c6cff) !important;
+            box-shadow: 0 0 0 .25rem rgba(124,108,255,.25);
+            transform: translateY(-2px);
+        }
+
+@media (max-width: 400px) {
+    #otpBoxes {
+        grid-template-columns: repeat(6, 1fr) !important;
+        grid-template-rows: 52px !important;
+        gap: 6px !important;
+    }
+
+        #otpBoxes input.otp-box {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            height: 52px !important;
+            font-size: 1.25rem !important;
+        }
+}

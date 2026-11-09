@@ -5,6 +5,8 @@ using BulkyBook.Utility;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using BulkyBookWeb.DataAccess.Data;
+using BulkyBookWeb.Security;
 using System.Net;
 
 namespace BulkyBookWeb.Areas.Identity.Controllers
@@ -17,9 +19,11 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IShoppingCartService _shoppingCartService;
         private readonly IEmailService _emailService;
-        public AccountController(UserManager<ApplicationUser> userManager , SignInManager<ApplicationUser> signInManager, RoleManager<IdentityRole> roleManager, IShoppingCartService shoppingCartService, IEmailService emailService)
+        private readonly PasswordResetOtpManager _otp;
+        public AccountController(UserManager<ApplicationUser> userManager , SignInManager<ApplicationUser> signInManager, RoleManager<IdentityRole> roleManager, IShoppingCartService shoppingCartService, IEmailService emailService, ApplicationDbContext db, IConfiguration config)
         {
             _emailService = emailService;
+            _otp = new PasswordResetOtpManager(db, config);
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
@@ -158,19 +162,71 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
         {
             if (!ModelState.IsValid) return View(model);
 
+            await SendOtpAsync(model.Email);
+            // Same answer whether or not the e-mail exists (no account enumeration).
+            return RedirectToAction(nameof(VerifyOtp), new { email = model.Email });
+        }
+
+        /// <summary>Issues a NEW code (the previous one stops working) and e-mails it.</summary>
+        private async Task SendOtpAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null) return;
+
+            var code = await _otp.IssueAsync(user);
+            if (code == null) return;   // hourly limit reached: silently ignore
+
+            var minutes = (int)PasswordResetOtpManager.Lifetime.TotalMinutes;
+            var body =
+                "<div style=\"font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:auto;padding:28px;border-radius:18px;background:#0f1428;color:#e9ecfa\">" +
+                $"<h2 style=\"margin:0 0 6px\">Reset your password</h2>" +
+                $"<p style=\"color:#98a2c3\">Hello {WebUtility.HtmlEncode(user.Name)}, use this code to reset your BulkyBook password:</p>" +
+                $"<div style=\"font-size:36px;letter-spacing:10px;font-weight:800;text-align:center;padding:18px;margin:18px 0;border-radius:14px;background:#1a2142;color:#8fb4ff\">{code}</div>" +
+                $"<p style=\"color:#98a2c3;font-size:14px\">It expires in {minutes} minutes and works once. If you ask for another code, this one stops working. " +
+                "If you did not request it, you can ignore this e-mail.</p></div>";
+            await _emailService.SendEmailAsync(user.Email!, "Your BulkyBook verification code", body);
+        }
+
+        public IActionResult VerifyOtp(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return RedirectToAction(nameof(ForgotPassword));
+            return View(new VerifyOtpVM { Email = email });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VerifyOtp(VerifyOtpVM model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
             var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user != null)
+            var result = user == null ? OtpResult.Invalid : await _otp.VerifyAsync(user, model.Code);
+
+            if (result == OtpResult.Ok && user != null)
             {
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var link = Url.Action("ResetPassword", "Account", new { area = "Identity", email = user.Email, token }, Request.Scheme);
-                var body = $"<p>Hello {WebUtility.HtmlEncode(user.Name)},</p>" +
-                           $"<p>We received a request to reset your BulkyBook password.</p>" +
-                           $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Choose a new password</a></p>" +
-                           $"<p>If you did not request this, you can safely ignore this e-mail.</p>";
-                await _emailService.SendEmailAsync(user.Email!, "Reset your BulkyBook password", body);
+                return RedirectToAction(nameof(ResetPassword), new { email = user.Email, token });
             }
-            // Same answer whether or not the e-mail exists (no account enumeration).
-            return RedirectToAction(nameof(ForgotPasswordConfirmation));
+
+            ModelState.Clear();
+            ModelState.AddModelError(string.Empty, result switch
+            {
+                OtpResult.Expired => "This code has expired. Request a new one.",
+                OtpResult.TooManyAttempts => "Too many wrong attempts. Request a new code.",
+                _ => "That code is not correct or is no longer valid."
+            });
+            model.Code = string.Empty;
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendOtp(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return RedirectToAction(nameof(ForgotPassword));
+            await SendOtpAsync(email);
+            TempData["success"] = "A new code was sent. Older codes no longer work.";
+            return RedirectToAction(nameof(VerifyOtp), new { email });
         }
 
         public IActionResult ForgotPasswordConfirmation() => View();
@@ -198,6 +254,7 @@ namespace BulkyBookWeb.Areas.Identity.Controllers
             var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
             if (result.Succeeded)
             {
+                await _otp.InvalidateAsync(user);
                 return RedirectToAction(nameof(ResetPasswordConfirmation));
             }
             foreach (var error in result.Errors)

@@ -1,0 +1,21 @@
+@model int
+@{
+    // 1 = Cart, 2 = Payment, 3 = Confirmation
+    string Cls(int s) => Model > s ? "done" : (Model == s ? "active" : "");
+    var steps = new[] { (1, "Cart", "bi-bag"), (2, "Payment", "bi-credit-card"), (3, "Done", "bi-check2") };
+}
+<link rel="stylesheet" href="~/css/checkout.css" asp-append-version="true" />
+<ol class="co-steps" aria-label="Checkout progress">
+    @for (var i = 0; i < steps.Length; i++)
+    {
+        var s = steps[i];
+        <li class="co-step @Cls(s.Item1)" @(Model == s.Item1 ? "aria-current=step" : "")>
+            <span class="dot">@if (Model > s.Item1) { <i class="bi bi-check-lg"></i> } else { <i class="bi @s.Item3"></i> }</span>
+            <span class="t">@s.Item2</span>
+        </li>
+        @if (i < steps.Length - 1)
+        {
+            <li class="co-bar @(Model > s.Item1 ? "done" : "")" aria-hidden="true"></li>
+        }
+    }
+</ol>

@@ -20,10 +20,12 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
         private readonly IApplicationUserService _applicationUserService;
         private readonly IEmailService _emailService;
         private readonly ILogger<CartController> _logger;
+        private readonly IConfiguration _config;
 
         public CartController(IOrderService orderService, IShoppingCartService shoppingCartService,
-            IApplicationUserService applicationUserService, IEmailService emailService, ILogger<CartController> logger)
+            IApplicationUserService applicationUserService, IEmailService emailService, ILogger<CartController> logger, IConfiguration config)
         {
+            _config = config;
             _orderService = orderService;
             _shoppingCartService = shoppingCartService;
             _applicationUserService = applicationUserService;
@@ -123,6 +125,13 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
             };
             var created = await _orderService.CreateOrderAsync(header);
 
+            // Default: on-site payment page (Stripe Payment Element).
+            // Set "Stripe:UseHostedCheckout" = true to go back to the redirect to Stripe's hosted page.
+            if (!_config.GetValue<bool>("Stripe:UseHostedCheckout"))
+            {
+                return RedirectToAction("Pay", "Checkout", new { area = "Customer", orderId = created.Id });
+            }
+
             try
             {
                 var domain = Request.Scheme + "://" + Request.Host.Value;
@@ -157,6 +166,12 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
             {
                 var result = await _orderService.VerifyStripePaymentAsync(order);
                 paid = result.IsPaid;
+                if (!paid)
+                {
+                    // on-site (PaymentIntent) payments have no Checkout Session: trust the order status
+                    var fresh = await _orderService.GetOrderByIdAsync(id);
+                    paid = fresh != null && (fresh.OrderStatus == SD.StatusApproved || fresh.OrderStatus == SD.StatusInProcess || fresh.OrderStatus == SD.StatusShipped);
+                }
                 if (result.NewlyApproved)
                 {
                     await AfterPaymentAsync(order, userId);

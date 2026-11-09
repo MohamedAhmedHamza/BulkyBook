@@ -5,7 +5,9 @@
     var units = items.Sum(i => i.Count);
 }
 
-<div class="container py-4" style="max-width:1140px">
+<partial name="_CheckoutSteps" model="1" />
+
+<div class="container pb-4" style="max-width:1140px">
     <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
         <div>
             <h1 class="h3 fw-bold mb-0">Shopping cart</h1>
@@ -134,7 +136,7 @@
                                 <span class="fw-semibold">Total</span>
                                 <span class="h4 fw-bold mb-0">@Model.OrderHeader.OrderTotal.ToString("c")</span>
                             </div>
-                            <button type="submit" class="btn btn-brand btn-lg w-100"><i class="bi bi-lock me-2"></i>Pay securely with Stripe</button>
+                            <button type="submit" class="btn btn-brand btn-lg w-100">Continue to payment<i class="bi bi-arrow-right ms-2"></i></button>
                             <div class="d-flex justify-content-center gap-3 mt-3 text-secondary" style="font-size:.75rem">
                                 <span><i class="bi bi-shield-check me-1"></i>Secure payment</span>
                                 <span><i class="bi bi-truck me-1"></i>Free shipping</span>

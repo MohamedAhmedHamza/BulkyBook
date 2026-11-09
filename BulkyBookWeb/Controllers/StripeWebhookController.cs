@@ -8,7 +8,7 @@ namespace BulkyBookWeb.Controllers
     /// <summary>
     /// Stripe -> server notifications. Configure in the Stripe dashboard:
     ///   endpoint  : https://YOUR-DOMAIN/stripe/webhook
-    ///   events    : checkout.session.completed, checkout.session.expired
+    ///   events    : payment_intent.succeeded (on-site payment), checkout.session.completed, checkout.session.expired
     ///   secret    : put the signing secret in configuration key "Stripe:WebhookSecret".
     /// </summary>
     [ApiController]
@@ -53,6 +53,18 @@ namespace BulkyBookWeb.Controllers
             {
                 _logger.LogWarning(ex, "Invalid Stripe webhook signature.");
                 return BadRequest();
+            }
+
+            if (stripeEvent.Type == "payment_intent.succeeded" && stripeEvent.Data.Object is PaymentIntent paymentIntent
+                && paymentIntent.Metadata != null
+                && paymentIntent.Metadata.TryGetValue("orderId", out var piOrderText)
+                && int.TryParse(piOrderText, out var piOrderId))
+            {
+                if (await _orderService.MarkAsPaidAsync(piOrderId, null, paymentIntent.Id))
+                {
+                    await AfterPaymentAsync(piOrderId);
+                }
+                return Ok();
             }
 
             if (stripeEvent.Data.Object is Session session
