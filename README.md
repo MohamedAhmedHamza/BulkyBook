@@ -1,26 +1,119 @@
-# BulkyBook – Aurora redesign (v3)
-Copy these files over the project (same paths). Nothing here touches your own edits
-(OrderController, OrderService, Product/Upsert.cshtml, Program.cs, csproj, appsettings*).
-NOT compiled (no .NET SDK in my environment) - send me any build error.
+# 📚 BulkyBook – Online Bookstore
 
-## New files
-- wwwroot/css/aurora.css   design system (dark/light glass, aurora glow, motion, bootstrap + DataTables + SweetAlert + toastr skin)
-- wwwroot/css/admin.css    admin shell, KPI strip, panels, orders board
-- wwwroot/js/aurora.js     theme toggle, collapsible sidebar, reveal-on-scroll, count-up, spotlight
-- wwwroot/js/orders-board.js   kanban board (reads /admin/order/Getall?status=all)
+An online bookstore built with **ASP.NET Core MVC**, featuring product management, shopping cart, order processing, and secure online payments.
 
-## Replaced files
-- Views/Shared/_AdminLayout.cshtml, _AdminSidebarNav.cshtml   (new glass sidebar, role-aware, "to pack" badge, search, Ctrl+K, collapse to icon rail)
-- Views/Shared/_Layout.cshtml, _LoginPartial.cshtml          (floating glass navbar, shared theme toggle)
-- wwwroot/css/theme.css  (store components re-skinned on Aurora tokens)
-- wwwroot/css/site.css   (ONLY change: old "Dark Theme Overrides" block removed - it fought the new theme)
-- Areas/Admin/Views/Dashboard/Index.cshtml + wwwroot/js/dashboard.js + DashboardController.cs + BulkyBook.Models/ViewModels/DaschBoardVM.cs
-- Areas/Admin/Views/Order/Index.cshtml + wwwroot/js/orders.js     (Board / Table switch, status pills)
-- Areas/Customer/Views/Home/_Hero.cshtml
-- Areas/Customer/Controllers/CartController.cs  (one line: OrderDate = DateTime.Now, same clock as the rest of your data)
+🌐 **Live Demo:** https://bulkybooktest.runasp.net/
 
-## Behaviour notes
-- Revenue now counts Approved + Processing + Shipped (before: Approved + Shipped only).
-- Orders board is read-only (cards open the order page). Status changes still go through your OrderController.
-- Users link in the sidebar is shown to Admin only.
-- All other admin pages (Products, Categories, Users, Order details, Upsert) are restyled by CSS only - markup untouched.
+💻 **GitHub:** https://github.com/MohamedAhmedHamza/BulkyBook
+
+## ✨ Features
+
+- User Authentication & Role-Based Authorization.
+- Product and Category Management.
+- Shopping Cart & Order Management.
+- Stripe Payment Integration & Webhooks.
+- Email Notifications using Mailjet.
+- Password Reset using OTP Verification.
+- Admin Dashboard and User Management.
+
+## 🏗️ Architecture
+
+The project follows a layered architecture:
+
+```mermaid
+flowchart TD
+    A[BulkyBookWeb] --> B[BulkyBook.Business]
+    B --> C[BulkyBook.DataAccess]
+    B --> D[BulkyBook.Models]
+    C --> D
+    B --> E[BulkyBook.Utility]
+    C --> F[(SQL Server)]
+```
+
+| Project | Responsibility |
+|---|---|
+| BulkyBookWeb | MVC, Controllers & Views |
+| BulkyBook.Business | Business Logic & Services |
+| BulkyBook.DataAccess | EF Core, Repositories & Unit of Work |
+| BulkyBook.Models | Entities & ViewModels |
+| BulkyBook.Utility | Shared Constants & Utilities |
+
+## 🗄️ Database Relationships
+
+```mermaid
+erDiagram
+    CATEGORY ||--o{ PRODUCT : contains
+    PRODUCT ||--o{ SHOPPING_CART : added_to
+    APPLICATION_USER ||--o{ SHOPPING_CART : owns
+    APPLICATION_USER ||--o{ ORDER_HEADER : places
+    ORDER_HEADER ||--|{ ORDER_DETAILS : contains
+    PRODUCT ||--o{ ORDER_DETAILS : references
+```
+
+## 🛠️ Technologies
+
+- C# / ASP.NET Core MVC / .NET 10
+- Entity Framework Core / SQL Server
+- ASP.NET Core Identity
+- Repository Pattern & Unit of Work
+- AutoMapper
+- HTML / CSS / JavaScript / Bootstrap
+- Stripe / Mailjet
+- Git / GitHub
+- MonsterASP Hosting
+
+## 📸 Screenshots
+
+Add screenshots to `docs/images/`:
+
+| Home | Products |
+|---|---|
+| ![Home](docs/images/home.png) | ![Products](docs/images/products.png) |
+
+| Cart | Admin Dashboard |
+|---|---|
+| ![Cart](docs/images/cart.png) | ![Dashboard](docs/images/dashboard.png) |
+
+## 🚀 Run Locally
+
+**Requirements:** .NET 10 SDK and SQL Server.
+
+```bash
+git clone https://github.com/MohamedAhmedHamza/BulkyBook.git
+cd BulkyBook
+dotnet restore
+dotnet build
+```
+
+Configure the database connection and external service credentials, then run migrations:
+
+```bash
+dotnet ef database update --project BulkyBook.DataAccess --startup-project BulkyBookWeb
+```
+
+Run the application:
+
+```bash
+dotnet run --project BulkyBookWeb
+```
+
+## 🔐 Environment Variables
+
+Configure the following settings:
+
+- `ConnectionStrings__DefaultConnection`
+- `Otp__Secret`
+- Stripe API and webhook credentials.
+- Mailjet API credentials and sender settings.
+
+**Never commit secrets or connection strings to GitHub.**
+
+## 👨‍💻 Author
+
+**Mohamed Ahmed Hamza**
+
+[GitHub Profile](https://github.com/MohamedAhmedHamza)
+
+---
+
+*ASP.NET Core MVC Online Bookstore – Full-Stack Development Project.*
